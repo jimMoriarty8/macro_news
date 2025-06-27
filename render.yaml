@@ -1,10 +1,3 @@
-# DEĞİŞİKLİK 1: "disks" bölümü artık en üst seviyede, servislerin içinde değil.
-# Bu bölüm, Render'a "bana data-disk adında 5GB'lık bir disk oluştur" der.
-disks:
-  - name: data-disk
-    mountPath: /data # Bu diskin sunucudaki varsayılan yolu
-    sizeGB: 5
-
 services:
   # Servis 1: Sürekli çalışacak olan canlı haber analiz botu
   - type: worker
@@ -16,11 +9,12 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
-    # DEĞİŞİKLİK 2: "disks" (çoğul) yerine "disk" (tekil) kullanılıyor.
-    # Bu satır, bu servise "yukarıda tanımlanan data-disk'i kullan" der.
+    # DEĞİŞİKLİK: Disk tanımı doğrudan servisin içine, "disk:" (tekil) olarak yazılıyor.
+    # Diski ilk kez burada tanımladığımız için boyutunu (sizeGB) belirtiyoruz.
     disk:
       name: data-disk
-      mountPath: /data # Diskin bu servis için bağlanacağı yol
+      mountPath: /data
+      sizeGB: 5
 
   # Servis 2: Veritabanını periyodik olarak güncelleyecek olan Cron Job
   - type: cron
@@ -33,7 +27,8 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
-    # DEĞİŞİKLİK 2: "disks" (çoğul) yerine "disk" (tekil) kullanılıyor.
+    # DEĞİŞİKLİK: Bu servis, yukarıda zaten oluşturulmuş olan diski kullanıyor.
+    # Sadece ismini ve bağlanacağı yolu belirtmemiz yeterli.
     disk:
       name: data-disk
       mountPath: /data
