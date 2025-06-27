@@ -96,12 +96,13 @@ def initialize_analyst_assistant():
             vector_store = Chroma.from_documents(documents=documents, embedding=embeddings, persist_directory=config.CHROMA_DB_PATH)
             print(f"Yeni veritabanı oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
         else:
+            
             # HİÇBİR ŞEY YOKSA (YENİ KURULUM): Boş bir veritabanı oluştur.
             print("UYARI: Ne mevcut bir vektör DB ne de knowledge_base.csv bulundu.")
-            print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor. Veritabanını doldurmak için güncelleyiciyi çalıştırın.")
+            print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor...")
             # Boş bir document listesi ile Chroma'yı başlat
-            vector_store = Chroma.from_documents(documents=[], embedding=embeddings, persist_directory=config.CHROMA_DB_PATH)
-            print(f"Boş veritabanı başarıyla oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
+            vector_store = Chroma.from_documents(documents=[], embedding=embeddings, persist_directory=config.CHROMA_DB_PATH) # <-- HATA BURADA
+            print(f"Boş veritabanı başarıyla oluşturuldu...")
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
