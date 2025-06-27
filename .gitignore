@@ -1,0 +1,29 @@
+# Python'a özel geçici dosyalar ve klasörler
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.~
+*pip-log.txt
+pip-delete-this-directory.txt
+
+# Sanal Ortam klasörleri (çok önemli)
+venv/
+.venv/
+env/
+.env/
+
+# Gizli API anahtarlarını içeren .env dosyası (EN ÖNEMLİ)
+.env
+
+# Veritabanı ve Data Dosyaları
+# Bunlar Render'daki diskte yaşayacak, GitHub'a yüklenmeyecek.
+*.csv
+*.db
+chroma_db/
+data/
+
+# İşletim sistemi ve IDE'ye özel dosyalar
+.idea/
+.vscode/
+.DS_Store

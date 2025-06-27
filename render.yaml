@@ -1,0 +1,30 @@
+services:
+  # Servis 1: Sürekli çalışacak olan canlı haber analiz botu
+  - type: worker
+    name: news-analyzer-bot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python main.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.5
+      - fromGroup: news-bot-secrets
+    disks:
+      - name: data-disk
+        mountPath: /data
+        sizeGB: 5
+
+  # Servis 2: Veritabanını periyodik olarak güncelleyecek olan Cron Job
+  - type: cron
+    name: database-updater
+    env: python
+    schedule: "0 3 * * *" # Her gün UTC saatiyle 03:00'da çalışır
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python run_update.py"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.5
+      - fromGroup: news-bot-secrets
+    disks:
+      - name: data-disk
+        mountPath: /data
