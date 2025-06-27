@@ -75,7 +75,9 @@ def initialize_analyst_assistant():
     Veritabanı veya CSV dosyası olmadığında sıfırdan boş bir DB oluşturabilir.
     """
     print("RAG Analist Asistanı başlatılıyor...")
+    # ... (diğer import ve ayarlarınız)
     embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL)
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
     
     if os.path.exists(config.CHROMA_DB_PATH):
         print(f"Mevcut vektör veritabanı '{config.CHROMA_DB_PATH}' klasöründen yükleniyor...")
@@ -85,8 +87,7 @@ def initialize_analyst_assistant():
         print("UYARI: Ne mevcut bir vektör DB ne de knowledge_base.csv bulundu.")
         print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor...")
         
-        # Kütüphanenin "boş liste" hatası vermemesi için, içinde içeriği boş olan
-        # tek bir geçici döküman oluşturuyoruz.
+        # DOĞRU YÖNTEM: İçinde geçici bir döküman olan liste ile başlatma
         placeholder_doc = Document(page_content="initialization_document")
         vector_store = Chroma.from_documents(
             documents=[placeholder_doc], 
@@ -94,6 +95,8 @@ def initialize_analyst_assistant():
             persist_directory=config.CHROMA_DB_PATH
         )
         print(f"Boş veritabanı başarıyla oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
+
+    retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
