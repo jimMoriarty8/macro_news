@@ -72,37 +72,28 @@ def parse_analyst_report(report_text):
 def initialize_analyst_assistant():
     """
     Vektör veritabanını, LLM'i ve RAG zincirini kurar.
-    YENİ: Veritabanı veya CSV dosyası olmadığında sıfırdan boş bir DB oluşturabilir.
+    Veritabanı veya CSV dosyası olmadığında sıfırdan boş bir DB oluşturabilir.
     """
     print("RAG Analist Asistanı başlatılıyor...")
     embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL)
     
-    # Chroma veritabanı var mı diye kontrol et
     if os.path.exists(config.CHROMA_DB_PATH):
         print(f"Mevcut vektör veritabanı '{config.CHROMA_DB_PATH}' klasöründen yükleniyor...")
         vector_store = Chroma(persist_directory=config.CHROMA_DB_PATH, embedding_function=embeddings)
         print("Veritabanı başarıyla yüklendi.")
     else:
-        # Yoksa, knowledge_base.csv var mı diye bak
-        if os.path.exists(config.KNOWLEDGE_BASE_CSV):
-            print(f"'{config.KNOWLEDGE_BASE_CSV}' dosyasından yeni bir vektör veritabanı oluşturuluyor...")
-            df = pd.read_csv(config.KNOWLEDGE_BASE_CSV)
-            documents = [
-                Document(
-                    page_content=row['rag_content'],
-                    metadata={'source': row.get('source'), 'title': row.get('title'), 'publish_date': row.get('timestamp')}
-                ) for index, row in df.iterrows()
-            ]
-            vector_store = Chroma.from_documents(documents=documents, embedding=embeddings, persist_directory=config.CHROMA_DB_PATH)
-            print(f"Yeni veritabanı oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
-        else:
-            
-            # HİÇBİR ŞEY YOKSA (YENİ KURULUM): Boş bir veritabanı oluştur.
-            print("UYARI: Ne mevcut bir vektör DB ne de knowledge_base.csv bulundu.")
-            print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor...")
-            # Boş bir document listesi ile Chroma'yı başlat
-            vector_store = Chroma.from_documents(documents=[], embedding=embeddings, persist_directory=config.CHROMA_DB_PATH) # <-- HATA BURADA
-            print(f"Boş veritabanı başarıyla oluşturuldu...")
+        print("UYARI: Ne mevcut bir vektör DB ne de knowledge_base.csv bulundu.")
+        print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor...")
+        
+        # Kütüphanenin "boş liste" hatası vermemesi için, içinde içeriği boş olan
+        # tek bir geçici döküman oluşturuyoruz.
+        placeholder_doc = Document(page_content="initialization_document")
+        vector_store = Chroma.from_documents(
+            documents=[placeholder_doc], 
+            embedding=embeddings, 
+            persist_directory=config.CHROMA_DB_PATH
+        )
+        print(f"Boş veritabanı başarıyla oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
