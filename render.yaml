@@ -1,5 +1,7 @@
+# Doğru ve Çalışacak Olan render.yaml Kodu
+
 services:
-  # Servis 1: Sürekli çalışacak olan canlı haber analiz botu
+  # Servis 1: Canlı haber botu (diski ilk kez bu servis oluşturacak)
   - type: worker
     name: news-analyzer-bot
     env: python
@@ -9,14 +11,12 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
-    # DEĞİŞİKLİK: Disk tanımı doğrudan servisin içine, "disk:" (tekil) olarak yazılıyor.
-    # Diski ilk kez burada tanımladığımız için boyutunu (sizeGB) belirtiyoruz.
     disk:
       name: data-disk
       mountPath: /data
-      sizeGB: 5
+      sizeGB: 5 # Disk burada oluşturuluyor
 
-  # Servis 2: Veritabanını periyodik olarak güncelleyecek olan Cron Job
+  # Servis 2: Veritabanı güncelleyici (yukarıda oluşturulan diski kullanacak)
   - type: cron
     name: database-updater
     env: python
@@ -27,8 +27,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
-    # DEĞİŞİKLİK: Bu servis, yukarıda zaten oluşturulmuş olan diski kullanıyor.
-    # Sadece ismini ve bağlanacağı yolu belirtmemiz yeterli.
     disk:
       name: data-disk
-      mountPath: /data
+      mountPath: /data # Sadece bağlanacağı yolu ve ismi belirtmek yeterli
