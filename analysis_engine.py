@@ -12,6 +12,7 @@ import re
 import requests
 from dotenv import load_dotenv
 from binance.client import Client as BinanceClient
+import config
 
 # .env dosyasındaki tüm değişkenleri yükle
 load_dotenv()
@@ -70,29 +71,37 @@ def parse_analyst_report(report_text):
 # --- 3. RAG SİSTEMİ KURULUM FONKSİYONU ---
 def initialize_analyst_assistant():
     """
-    Vektör veritabanını, LLM'i ve RAG zincirini kurar ve analiz için hazır olan `rag_chain` nesnesini döndürür.
+    Vektör veritabanını, LLM'i ve RAG zincirini kurar.
+    YENİ: Veritabanı veya CSV dosyası olmadığında sıfırdan boş bir DB oluşturabilir.
     """
     print("RAG Analist Asistanı başlatılıyor...")
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    if os.path.exists(CHROMA_DB_PATH):
-        print(f"Mevcut vektör veritabanı '{CHROMA_DB_PATH}' klasöründen yükleniyor...")
-        vector_store = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embeddings)
+    embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL)
+    
+    # Chroma veritabanı var mı diye kontrol et
+    if os.path.exists(config.CHROMA_DB_PATH):
+        print(f"Mevcut vektör veritabanı '{config.CHROMA_DB_PATH}' klasöründen yükleniyor...")
+        vector_store = Chroma(persist_directory=config.CHROMA_DB_PATH, embedding_function=embeddings)
         print("Veritabanı başarıyla yüklendi.")
     else:
-        print(f"'{KNOWLEDGE_BASE_CSV}' dosyasından yeni bir vektör veritabanı oluşturuluyor...")
-        try:
-            df = pd.read_csv(KNOWLEDGE_BASE_CSV)
+        # Yoksa, knowledge_base.csv var mı diye bak
+        if os.path.exists(config.KNOWLEDGE_BASE_CSV):
+            print(f"'{config.KNOWLEDGE_BASE_CSV}' dosyasından yeni bir vektör veritabanı oluşturuluyor...")
+            df = pd.read_csv(config.KNOWLEDGE_BASE_CSV)
             documents = [
                 Document(
                     page_content=row['rag_content'],
-                    metadata={'source': row['source'], 'title': row['title'], 'publish_date': row['timestamp']}
+                    metadata={'source': row.get('source'), 'title': row.get('title'), 'publish_date': row.get('timestamp')}
                 ) for index, row in df.iterrows()
             ]
-            vector_store = Chroma.from_documents(documents=documents, embedding=embeddings, persist_directory=CHROMA_DB_PATH)
-            print(f"Yeni veritabanı oluşturuldu ve '{CHROMA_DB_PATH}' klasörüne kaydedildi.")
-        except FileNotFoundError:
-            print(f"HATA: '{KNOWLEDGE_BASE_CSV}' dosyası bulunamadı. Lütfen önce veri toplama ve işleme script'lerini çalıştırın.")
-            exit()
+            vector_store = Chroma.from_documents(documents=documents, embedding=embeddings, persist_directory=config.CHROMA_DB_PATH)
+            print(f"Yeni veritabanı oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
+        else:
+            # HİÇBİR ŞEY YOKSA (YENİ KURULUM): Boş bir veritabanı oluştur.
+            print("UYARI: Ne mevcut bir vektör DB ne de knowledge_base.csv bulundu.")
+            print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor. Veritabanını doldurmak için güncelleyiciyi çalıştırın.")
+            # Boş bir document listesi ile Chroma'yı başlat
+            vector_store = Chroma.from_documents(documents=[], embedding=embeddings, persist_directory=config.CHROMA_DB_PATH)
+            print(f"Boş veritabanı başarıyla oluşturuldu ve '{config.CHROMA_DB_PATH}' klasörüne kaydedildi.")
 
     llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
