@@ -9,6 +9,8 @@ import os
 # Eğer yukarıdaki DATA_DIR yorumdaysa, mevcut klasörü baz al.
 DATA_DIR = os.getcwd()
 
+ARCHIVE_START_DATE = "2020-01-01" 
+
 # --- DOSYA YOLLARI ---
 # Tüm dosya yollarını bu merkezi yerden yöneteceğiz.
 LIVE_BUFFER_CSV = os.path.join(DATA_DIR, "live_buffer.csv")
