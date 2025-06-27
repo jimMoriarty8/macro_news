@@ -1,7 +1,5 @@
-# Doğru ve Çalışacak Olan render.yaml Kodu
-
 services:
-  # Servis 1: Canlı haber botu (diski ilk kez bu servis oluşturacak)
+  # Servis 1: Canlı haber botu (DEĞİŞİKLİK YOK)
   - type: worker
     name: news-analyzer-bot
     env: python
@@ -14,19 +12,18 @@ services:
     disk:
       name: data-disk
       mountPath: /data
-      sizeGB: 5 # Disk burada oluşturuluyor
+      sizeGB: 5
 
-  # Servis 2: Veritabanı güncelleyici (yukarıda oluşturulan diski kullanacak)
-  - type: cron
+  # Servis 2: Veritabanı güncelleyici (ARTIK BU DA BİR WORKER)
+  - type: worker # <-- DEĞİŞTİ: 'cron' yerine 'worker' oldu
     name: database-updater
     env: python
-    schedule: "0 3 * * *"
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python run_update.py"
+    startCommand: "python updater_worker.py" # <-- DEĞİŞTİ: Yeni betiği çalıştırıyor
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
     disk:
       name: data-disk
-      mountPath: /data # Sadece bağlanacağı yolu ve ismi belirtmek yeterli
+      mountPath: /data
