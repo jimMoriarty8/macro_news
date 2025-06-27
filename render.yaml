@@ -1,3 +1,10 @@
+# DEĞİŞİKLİK 1: "disks" bölümü artık en üst seviyede, servislerin içinde değil.
+# Bu bölüm, Render'a "bana data-disk adında 5GB'lık bir disk oluştur" der.
+disks:
+  - name: data-disk
+    mountPath: /data # Bu diskin sunucudaki varsayılan yolu
+    sizeGB: 5
+
 services:
   # Servis 1: Sürekli çalışacak olan canlı haber analiz botu
   - type: worker
@@ -9,22 +16,24 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
-    disks:
-      - name: data-disk
-        mountPath: /data
-        sizeGB: 5
+    # DEĞİŞİKLİK 2: "disks" (çoğul) yerine "disk" (tekil) kullanılıyor.
+    # Bu satır, bu servise "yukarıda tanımlanan data-disk'i kullan" der.
+    disk:
+      name: data-disk
+      mountPath: /data # Diskin bu servis için bağlanacağı yol
 
   # Servis 2: Veritabanını periyodik olarak güncelleyecek olan Cron Job
   - type: cron
     name: database-updater
     env: python
-    schedule: "0 3 * * *" # Her gün UTC saatiyle 03:00'da çalışır
+    schedule: "0 3 * * *"
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python run_update.py"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.5
       - fromGroup: news-bot-secrets
-    disks:
-      - name: data-disk
-        mountPath: /data
+    # DEĞİŞİKLİK 2: "disks" (çoğul) yerine "disk" (tekil) kullanılıyor.
+    disk:
+      name: data-disk
+      mountPath: /data
