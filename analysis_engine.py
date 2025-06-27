@@ -71,13 +71,11 @@ def parse_analyst_report(report_text):
 # --- 3. RAG SİSTEMİ KURULUM FONKSİYONU ---
 def initialize_analyst_assistant():
     """
-    Vektör veritabanını, LLM'i ve RAG zincirini kurar.
-    Veritabanı veya CSV dosyası olmadığında sıfırdan boş bir DB oluşturabilir.
+    Vektör veritabanını, LLM'i ve temel RAG parçalarını kurar.
+    Sadece retriever ve document_chain'i döndürür.
     """
     print("RAG Analist Asistanı başlatılıyor...")
-    # ... (diğer import ve ayarlarınız)
     embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL)
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
     
     if os.path.exists(config.CHROMA_DB_PATH):
         print(f"Mevcut vektör veritabanı '{config.CHROMA_DB_PATH}' klasöründen yükleniyor...")
@@ -86,8 +84,6 @@ def initialize_analyst_assistant():
     else:
         print("UYARI: Ne mevcut bir vektör DB ne de knowledge_base.csv bulundu.")
         print("Sıfırdan BOŞ bir vektör veritabanı oluşturuluyor...")
-        
-        # DOĞRU YÖNTEM: İçinde geçici bir döküman olan liste ile başlatma
         placeholder_doc = Document(page_content="initialization_document")
         vector_store = Chroma.from_documents(
             documents=[placeholder_doc], 
