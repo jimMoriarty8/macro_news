@@ -1,113 +1,107 @@
-# update_database.py
+# update_database.py (BASİTLEŞTİRİLMİŞ HALİ)
 
 import pandas as pd
 import os
 import html
-import shutil
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.docstore.document import Document
-from tqdm import tqdm
-import config
 
-# .env dosyasındaki API anahtarlarını yükle
+# .env dosyasını yükle
 load_dotenv()
 
-# --- AYARLAR ---
-# Ayarların hepsi merkezi config dosyamızdan geliyor
-os.environ["GOOGLE_API_KEY"] = os.getenv(config.GEMINI_API_KEY_ENV)
-RAW_DATA_CSV = config.RAW_NEWS_CSV
-KNOWLEDGE_BASE_CSV = config.KNOWLEDGE_BASE_CSV
-CHROMA_DB_PATH = config.CHROMA_DB_PATH
-EMBEDDING_MODEL = config.EMBEDDING_MODEL
+# --- AYARLAR (DEĞİŞİKLİK YOK) ---
+os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
+
+NEW_DATA_CSV = "temp_raw_news.csv" 
+KNOWLEDGE_BASE_CSV = "knowledge_base.csv"
+CHROMA_DB_PATH = "./chroma_db"
+
+HEDEF_SEMBOLLER = ['BTC/USD', "BTC", 'BTCUSD', 'ETH/USD', "ETH", 'ETHUSD',
+                   "SOL/USD", "SOL", 'SOLUSD', "XRP/USD", "XRP", 'XRPUSD',
+                   "BNB/USD", "BNB", 'BNBUSD', 'SPY', 'QQQ']
 # --- AYARLAR SONU ---
 
-def update_and_build_databases():
-    """
-    Ham veri dosyasını okur, işler ve hem ana CSV arşivini hem de
-    ChromaDB vektör veritabanını sıfırdan oluşturur/günceller.
-    """
-    print("\nVeritabanı oluşturma/güncelleme süreci başlatıldı...")
+def update_knowledge_base():
+    print("Hafıza güncelleme süreci başlatıldı...")
 
-    # 1. Ham veriyi yükle
-    if not os.path.exists(RAW_DATA_CSV):
-        print(f"HATA: '{RAW_DATA_CSV}' dosyası bulunamadı. Önce collect_data.py çalıştırılmalı.")
-        return
-    
+    # --- Adım 1: Yeni Veriyi Yükle ve İşle (DEĞİŞİKLİK YOK) ---
     try:
-        df_new_raw = pd.read_csv(RAW_DATA_CSV)
-        print(f"'{RAW_DATA_CSV}' dosyasından {len(df_new_raw)} ham haber yüklendi.")
-    except pd.errors.EmptyDataError:
-        print(f"'{RAW_DATA_CSV}' dosyası boş. İşlem durduruluyor.")
+        df_new = pd.read_csv(NEW_DATA_CSV)
+        print(f"'{NEW_DATA_CSV}' dosyasından {len(df_new)} yeni haber yüklendi.")
+    except FileNotFoundError:
+        print(f"HATA: '{NEW_DATA_CSV}' dosyası bulunamadı. Lütfen yeni haberleri bu isimle kaydedin.")
         return
 
-    # 2. Veriyi temizle ve işle
-    print("Veriler temizleniyor ve RAG formatına getiriliyor...")
-    df_new_raw['headline'] = df_new_raw['headline'].apply(lambda x: html.unescape(x) if isinstance(x, str) else x)
-    df_new_raw['summary'] = df_new_raw['summary'].apply(lambda x: html.unescape(x) if isinstance(x, str) else x)
-    df_new_raw.dropna(subset=['id', 'headline'], inplace=True)
-    df_new_raw['symbols'] = df_new_raw['symbols'].astype(str)
+    print("Yeni veriler temizleniyor ve RAG formatına getiriliyor...")
+    df_new['headline'] = df_new['headline'].apply(lambda x: html.unescape(x) if isinstance(x, str) else x)
+    df_new['summary'] = df_new['summary'].apply(lambda x: html.unescape(x) if isinstance(x, str) else x)
+    df_new.dropna(subset=['symbols', 'headline'], inplace=True)
+    
+    def contains_target_symbol(symbols_str):
+        return any(hedef_sembol in str(symbols_str) for hedef_sembol in HEDEF_SEMBOLLER)
+    df_new_filtered = df_new[df_new['symbols'].apply(contains_target_symbol)].copy()
 
     def create_rag_content(row):
         headline = row['headline']
         summary = row['summary']
-        # Özet yeterince uzunsa başlıkla birleştir, değilse sadece başlığı kullan
         if pd.notna(summary) and len(str(summary).split()) > 5:
-            return f"Headline: {headline}. Summary: {summary}"
-        return headline
-    df_new_raw['rag_content'] = df_new_raw.apply(create_rag_content, axis=1)
-
-    # 3. Ana arşivi (`knowledge_base.csv`) oluştur/güncelle
-    # Bu betik her zaman en temiz halini oluşturacağı için mevcut veriyi okuyup birleştirelim.
-    try:
-        df_existing_kb = pd.read_csv(KNOWLEDGE_BASE_CSV)
-    except FileNotFoundError:
-        df_existing_kb = pd.DataFrame()
+            return f"{headline}. {summary}"
+        else:
+            return headline
+    df_new_filtered['rag_content'] = df_new_filtered.apply(create_rag_content, axis=1)
     
-    df_combined = pd.concat([df_existing_kb, df_new_raw], ignore_index=True)
-    df_combined.drop_duplicates(subset=['id'], keep='last', inplace=True) # ID'ye göre mükerrerleri temizle
-    df_combined['timestamp'] = pd.to_datetime(df_combined['timestamp'])
-    df_combined.sort_values(by='timestamp', ascending=False, inplace=True) # En yeni en üstte olacak şekilde sırala
-    
-    # Temiz ve sıralı arşivi kaydet
-    df_combined.to_csv(KNOWLEDGE_BASE_CSV, index=False, encoding='utf-8-sig')
-    print(f"Ana arşiv '{KNOWLEDGE_BASE_CSV}' güncellendi. Toplam haber sayısı: {len(df_combined)}")
+    if df_new_filtered.empty:
+        print("Filtreleme sonrası işlenecek yeni haber bulunamadı.")
+        return
+        
+    print(f"{len(df_new_filtered)} adet yeni haber işlendi ve hafızaya eklenmeye hazır.")
 
-    # 4. ChromaDB'yi sıfırdan oluştur
-    print("\nMevcut ChromaDB (varsa) siliniyor ve temiz veriden yeniden oluşturuluyor...")
-    if os.path.exists(CHROMA_DB_PATH):
-        shutil.rmtree(CHROMA_DB_PATH) # shutil ile klasörü ve içindekileri tamamen sil
-
-    print("LangChain dökümanları hazırlanıyor...")
-    # df_combined'ın içindeki headline sütununu title olarak adlandıralım
-    df_combined.rename(columns={'headline': 'title'}, inplace=True)
+    # --- Adım 2: Mevcut Vektör Veritabanını Yükle ve Güncelle (DEĞİŞİKLİK YOK) ---
+    print("Mevcut vektör veritabanı yükleniyor...")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    vector_store = Chroma(persist_directory=CHROMA_DB_PATH, embedding_function=embeddings)
     
-    documents_to_embed = [
+    print("Yeni haberler vektör veritabanına ekleniyor...")
+    new_documents = [
         Document(
             page_content=row['rag_content'],
-            metadata={'source': row.get('source'), 'title': row.get('title'), 'publish_date': row.get('timestamp')}
-        )
-        for _, row in tqdm(df_combined.iterrows(), total=df_combined.shape[0], desc="Dökümanlar Vektöre Çevriliyor")
+            metadata={'source': row['source'], 'title': row['headline'], 'publish_date': row['timestamp']}
+        ) for index, row in df_new_filtered.iterrows()
     ]
+    vector_store.add_documents(new_documents)
+    print("Vektör veritabanı başarıyla güncellendi!")
 
-    if not documents_to_embed:
-        print("Vektör veritabanına eklenecek döküman bulunamadı.")
-        return
-
-    print("Embedding modeli ve ChromaDB başlatılıyor...")
-    embeddings = GoogleGenerativeAIEmbeddings(model=EMBEDDING_MODEL)
+    # --- Adım 3: Ana Arşiv CSV Dosyasını Güncelle (BURASI DEĞİŞTİ) ---
+    print("Ana CSV arşivi güncelleniyor...")
+    final_df_new = df_new_filtered[['timestamp', 'headline', 'rag_content', 'source', 'symbols']].copy()
+    final_df_new.rename(columns={'headline': 'title'}, inplace=True)
     
-    # Sıfırdan veritabanını oluştur
-    db = Chroma.from_documents(
-        documents=documents_to_embed,
-        embedding=embeddings,
-        persist_directory=CHROMA_DB_PATH
-    )
-    db.persist() # Değişikliklerin diske yazıldığından emin ol
-    print(f"ChromaDB başarıyla oluşturuldu. {len(documents_to_embed)} döküman eklendi.")
-    print("\nTüm veri işleme işlemleri tamamlandı.")
+    # --- YENİ VE BASİT SIRALAMA MANTIĞI ---
+    # 1. Mevcut knowledge_base.csv'yi oku (varsa).
+    try:
+        df_existing = pd.read_csv(KNOWLEDGE_BASE_CSV)
+    except FileNotFoundError:
+        df_existing = pd.DataFrame()
+
+    # 2. Eski ve yeni verileri birleştir.
+    df_combined = pd.concat([df_existing, final_df_new], ignore_index=True)
+    
+    # 3. Tekrar edenleri (aynı başlık ve zaman damgasına sahip olanlar) kaldır.
+    df_combined.drop_duplicates(subset=['timestamp', 'title'], inplace=True)
+    
+    # 4. Tüm birleşmiş veriyi tarihe göre sırala (en yeni en üstte olacak şekilde).
+    df_combined['timestamp'] = pd.to_datetime(df_combined['timestamp'])
+    df_combined.sort_values(by='timestamp', ascending=False, inplace=True)
+    
+    # 5. Sıralanmış bu tam listeyi dosyanın üzerine tamamen yaz.
+    df_combined.to_csv(KNOWLEDGE_BASE_CSV, index=False, encoding='utf-8-sig')
+    
+    print(f"Ana arşiv '{KNOWLEDGE_BASE_CSV}' başarıyla birleştirildi, sıralandı ve kaydedildi.")
+    print(f"Arşivdeki toplam haber sayısı: {len(df_combined)}")
+    print("\nTüm güncelleme işlemleri tamamlandı!")
 
 
 if __name__ == '__main__':
-    update_and_build_databases()
+    update_knowledge_base()
