@@ -16,10 +16,7 @@ def initialize_analyst_assistant():
     gerekli olan 3 aracı (retriever, document_chain, vector_store) döndürür.
     """
     print("RAG Analist Asistanı başlatılıyor...")
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        # Eğer anahtar bulunamazsa, programın çöküp nedenini söylemesini sağla
-        raise ValueError("HATA: GOOGLE_API_KEY ortam değişkeni bulunamadı! Lütfen Render'daki Environment Group'u kontrol edin.")
+    
     
     # Gerekli araçları ve modelleri başlat
     embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL)
