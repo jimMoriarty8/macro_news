@@ -16,7 +16,7 @@ load_dotenv()
 
 # --- AYARLAR ---
 # Ayarların hepsi merkezi config dosyamızdan geliyor
-os.environ["GOOGLE_API_KEY"] = os.getenv("GOOGLE_API_KEY") # Bu satır aslında analysis_engine'da gerekli ama burada olması da zarar vermez.
+os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY") # Bu satır aslında analysis_engine'da gerekli ama burada olması da zarar vermez.
 RAW_DATA_CSV = config.RAW_NEWS_CSV
 KNOWLEDGE_BASE_CSV = config.KNOWLEDGE_BASE_CSV
 CHROMA_DB_PATH = config.CHROMA_DB_PATH
