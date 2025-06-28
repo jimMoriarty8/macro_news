@@ -47,12 +47,12 @@ def collect_historical_news():
         while True:
             try:
                 request_params = NewsRequest(
-                    symbols=SYMBOLS_STRING,
-                    start=gun.strftime("%Y-%m-%d"),
-                    end=(gun + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
-                    limit=50,
-                    page_token=page_token
-                )
+                        symbols=SYMBOLS_STRING, # <-- DÜZELTME: Artık metin formatındaki değişkeni kullanıyoruz
+                        start=gun.strftime("%Y-%m-%d"),
+                        end=(gun + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
+                        limit=50,
+                        page_token=page_token
+    )
                 news_page = news_client.get_news(request_params)
                 
                 # Gelen verinin doğru formatta olup olmadığını kontrol et
