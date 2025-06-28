@@ -17,10 +17,12 @@ API_KEY = os.getenv(config.ALPACA_API_KEY_ENV)
 SECRET_KEY = os.getenv(config.ALPACA_SECRET_KEY_ENV)
 news_client = NewsClient(API_KEY, SECRET_KEY)
 
+
 # Ayarlar artık merkezi config dosyasından geliyor
+SYMBOLS_STRING = ",".join(config.SYMBOLS_TO_TRACK)
 CSV_FILENAME = config.RAW_NEWS_CSV
 START_DATE = config.ARCHIVE_START_DATE
-SYMBOLS_LIST = config.SYMBOLS_TO_TRACK
+
 # --- AYARLAR SONU ---
 
 def collect_historical_news():
@@ -45,7 +47,7 @@ def collect_historical_news():
         while True:
             try:
                 request_params = NewsRequest(
-                    symbols=SYMBOLS_LIST,
+                    symbols=SYMBOLS_STRING,
                     start=gun.strftime("%Y-%m-%d"),
                     end=(gun + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
                     limit=50,
