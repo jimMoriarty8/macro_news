@@ -15,7 +15,7 @@ SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 news_client = NewsClient(API_KEY, SECRET_KEY)
 
 CSV_FILENAME = config.RAW_NEWS_CSV
-BASLANGIC_TARIHI = "2020-01-21"
+BASLANGIC_TARIHI = "2025-06-21"
 SEMBOLLER_LISTESI = ['BTC/USD', "BTC", 'BTCUSD',
                      'ETH/USD', "ETH", 'ETHUSD',
                      "SOL/USD", "SOL", 'SOLUSD',
