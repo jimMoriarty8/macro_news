@@ -106,7 +106,7 @@ def update_and_build_databases():
         embedding=embeddings,
         persist_directory=CHROMA_DB_PATH
     )
-    db.persist()
+    
     print("ChromaDB başarıyla oluşturuldu ve veriler kalıcı olarak kaydedildi.")
     print("\nTüm veri işleme işlemleri tamamlandı.")
 
