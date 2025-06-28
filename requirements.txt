@@ -8,7 +8,7 @@ chromadb==1.0.13
 requests==2.32.4
 python-binance==1.0.29
 tqdm==4.67.1
-
+langchain-community==0.3.26
 
 
 
