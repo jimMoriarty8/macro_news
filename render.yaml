@@ -1,29 +1,17 @@
+# render.yaml (NİHAİ VE BASİTLEŞTİRİLMİŞ HALİ)
+
 services:
-  # Servis 1: Canlı haber botu (DEĞİŞİKLİK YOK)
+  # Artık sadece TEK BİR servisimiz var. Bu, main.py'yi çalıştıran ana botumuz.
   - type: worker
-    name: news-analyzer-bot
+    name: macro-news-analyzer # Servis adını daha genel yapabiliriz
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python main.py"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.5
-      - fromGroup: news-bot-secrets
+      - fromGroup: news-bot-secrets # API anahtarlarımızı buradan alacak
     disk:
       name: data-disk
       mountPath: /data
       sizeGB: 5
-
-  # Servis 2: Veritabanı güncelleyici (ARTIK BU DA BİR WORKER)
-  - type: worker # <-- DEĞİŞTİ: 'cron' yerine 'worker' oldu
-    name: database-updater
-    env: python
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python updater_worker.py" # <-- DEĞİŞTİ: Yeni betiği çalıştırıyor
-    envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.5
-      - fromGroup: news-bot-secrets
-    disk:
-      name: data-disk
-      mountPath: /data

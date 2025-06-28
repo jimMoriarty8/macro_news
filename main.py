@@ -1,14 +1,17 @@
-# main.py (GÜNCELLENMİŞ HALİ)
+# main.py
 
 import os
 import html
 import logging
+import pandas as pd
+import asyncio
 from dotenv import load_dotenv
 from alpaca.data.live.news import NewsDataStream
-import pandas as pd  # <-- YENİ: Pandas import edildi
+from langchain.docstore.document import Document
+from langchain_chroma import Chroma
 
 # Kendi dosyalarımızdan importlar
-import config  # <-- YENİ: config.py import edildi
+import config
 from analysis_engine import (
     initialize_analyst_assistant, 
     parse_analyst_report, 
@@ -16,97 +19,105 @@ from analysis_engine import (
     get_btc_price
 )
 
+# .env dosyasındaki tüm değişkenleri yükle
 load_dotenv()
 
 # --- 1. AYARLAR ---
-ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
-ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+ALPACA_API_KEY = os.getenv(config.ALPACA_API_KEY_ENV)
+ALPACA_SECRET_KEY = os.getenv(config.ALPACA_SECRET_KEY_ENV)
 CONFIDENCE_THRESHOLD = 7
 IMPACT_THRESHOLD = 7
-SYMBOL_WATCHLIST = config.SYMBOLS_TO_TRACK  # <-- DEĞİŞTİ: Ayar config'den geliyor
+SYMBOL_WATCHLIST = config.SYMBOLS_TO_TRACK
 
-# --- 2. KONTROL MERKEZİ ---
-retriever, document_chain = initialize_analyst_assistant()
+# --- 2. RAG SİSTEMİ KURULUMU ---
+# Program başlarken, analiz ve güncelleme için gerekli olan 3 aracı birden alıyoruz.
+retriever, document_chain, vector_store = initialize_analyst_assistant()
 
+# --- 3. ARKA PLAN VERİTABANI GÜNCELLEME GÖREVİ ("ŞEF") ---
+async def process_and_save_in_background(news_dict: dict, vs: Chroma):
+    """
+    Bu fonksiyon arka planda çalışır, ana botu bloklamaz.
+    Tek bir haberi işler ve veritabanlarına ekler.
+    """
+    try:
+        headline_short = news_dict.get('headline', '')[:40]
+        print(f"   -> Arka plan görevi başladı: '{headline_short}...' veritabanına ekleniyor.")
+        
+        # 1. Haberi işle ve RAG formatına getir
+        df_item = pd.DataFrame(news_dict, index=[0])
+        headline = df_item.iloc[0]['headline']
+        summary = df_item.iloc[0]['summary']
+        rag_content = f"Headline: {headline}. Summary: {summary}" if pd.notna(summary) and len(str(summary).split()) > 5 else headline
+        
+        # 2. Knowledge Base CSV'ye ekle (append modunda)
+        header_needed = not os.path.exists(config.KNOWLEDGE_BASE_CSV)
+        # Bu I/O işlemini de ana döngüyü bloklamamak için thread'de çalıştırabiliriz.
+        await asyncio.to_thread(
+            df_item.to_csv, config.KNOWLEDGE_BASE_CSV, mode='a', 
+            header=header_needed, index=False, encoding='utf-8-sig'
+        )
+
+        # 3. ChromaDB'ye eklemek için Document nesnesi oluştur
+        doc_to_add = Document(
+            page_content=rag_content,
+            metadata={'source': df_item.iloc[0]['source'], 'title': headline, 'publish_date': df_item.iloc[0]['timestamp']}
+        )
+        
+        # 4. ChromaDB'ye ekle (Bu senkron bir işlem olduğu için thread'de çalıştırarak ana döngüyü bloklamasını önle)
+        await asyncio.to_thread(vs.add_documents, [doc_to_add])
+        
+        print(f"   -> Arka plan görevi bitti: '{headline_short}...' eklendi.")
+    except Exception as e:
+        print(f"!!! ARKA PLAN GÜNCELLEME HATASI: {e}")
+
+
+# --- 4. CANLI HABER ANALİZ FONKSİYONU ("GARSON") ---
 async def analyze_news_on_arrival(data):
     """
-    Alpaca'dan gelen haberi alır, analiz eder, alarm gönderir VE GEÇİCİ DOSYAYA KAYDEDER.
+    Hızlıca haberi alır, analiz eder ve yavaş olan kaydetme işini arka plana atar.
     """
-    # --- YENİ: CANLI HABERİ DOSYAYA KAYDETME ---
     try:
-        news_data = {
-            "id": [data.id], "timestamp": [data.created_at], "headline": [data.headline],
-            "summary": [data.summary], "source": [data.source], 
-            "symbols": [",".join(data.symbols) if data.symbols else ""]
-        }
-        df_live = pd.DataFrame(news_data)
-        
-        header_needed = not os.path.exists(config.LIVE_BUFFER_CSV)
-        df_live.to_csv(config.LIVE_BUFFER_CSV, mode='a', header=header_needed, index=False, encoding='utf-8-sig')
-    except Exception as e:
-        print(f"HATA: Canlı haber buffer'a kaydedilemedi: {e}")
-    # --- KAYDETME BÖLÜMÜ SONU ---
-
-    try:
-        is_relevant = any(
-            watched_symbol in news_symbol
-            for news_symbol in data.symbols
-            for watched_symbol in SYMBOL_WATCHLIST
-        )
+        # İlgililik kontrolü
+        is_relevant = any(watched_symbol in str(data.symbols) for watched_symbol in SYMBOL_WATCHLIST)
         if not is_relevant:
             return
 
         headline = html.unescape(data.headline)
         print(f"\n📰 [İLGİLİ HABER GELDİ] {headline}")
-        print("   Analiz ediliyor...")
 
+        # Hızlı Analiz ve Alarm Kısmı
+        print("   Analiz ediliyor...")
         retrieved_docs = retriever.get_relevant_documents(headline)
         retrieved_docs.sort(key=lambda x: x.metadata.get('publish_date', '1970-01-01'))
-
-        report_text = document_chain.invoke({
-            "input": headline,
-            "context": retrieved_docs
-        })
+        report_text = document_chain.invoke({"input": headline, "context": retrieved_docs})
         
         print("\n--- ANALYST REPORT ---")
         print(report_text)
         
         parsed_report = parse_analyst_report(report_text)
-        
-        if parsed_report:
+        if parsed_report and parsed_report.get('confidence', 0) >= CONFIDENCE_THRESHOLD and parsed_report.get('impact', 0) >= IMPACT_THRESHOLD and parsed_report.get('direction').lower() != 'neutral':
+            print(f"✅ ALARM KRİTERLERİ KARŞILANDI!")
+            btc_price = get_btc_price()
             direction = parsed_report.get('direction', 'N/A')
-            impact = parsed_report.get('impact', 0)
-            confidence = parsed_report.get('confidence', 0)
-
-            print(f"\n--- Karar Motoru ---")
-            print(f"Tespit Edilen Yön: {direction}, Etki: {impact}, Güven: {confidence}")
-
-            if direction.lower() != 'neutral' and confidence >= CONFIDENCE_THRESHOLD and impact >= IMPACT_THRESHOLD:
-                print(f"✅ ALARM KRİTERLERİ KARŞILANDI!")
-                btc_price = get_btc_price()
-                direction_emoji = "🟢" if direction.lower() == 'positive' else "🔴" if direction.lower() == 'negative' else "⚪️"
-                
-                message = (
-                    f"{direction_emoji} *High-Potential Signal: {direction.upper()}*\n"
-                    f"*BTC/USDT Price:* `{btc_price}`\n\n"
-                    f"*Headline:*\n`{headline}`\n\n"
-                    f"*Scores:*\n"
-                    f"Impact: *{impact}/10* | Confidence: *{confidence}/10*\n\n"
-                    f"*Analyst Comment:*\n_{parsed_report.get('analysis', '')}_"
-                )
-                send_telegram_message(message)
-            else:
-                print("❌ Alarm kriterleri karşılanmadı.")
+            direction_emoji = "🟢" if direction.lower() == 'positive' else "🔴" if direction.lower() == 'negative' else "⚪️"
+            message = (f"{direction_emoji} *High-Potential Signal: {direction.upper()}*\n" f"*BTC/USDT Price:* `{btc_price}`\n\n" f"*Headline:*\n`{headline}`\n\n" f"*Scores:*\n" f"Impact: *{parsed_report.get('impact')}/10* | Confidence: *{parsed_report.get('confidence')}/10*\n\n" f"*Analyst Comment:*\n_{parsed_report.get('analysis', '')}_")
+            send_telegram_message(message)
+        else:
+            print("❌ Alarm kriterleri karşılanmadı veya yön 'Neutral'.")
         
-        print("="*50)
+        # --- YAVAŞ İŞİ ARKA PLANA ATMA ---
+        # Analiz bittikten sonra, veritabanı kaydetme işini bir arka plan görevine devret ve bekleme yapma.
+        news_item_dict = {"id": data.id, "timestamp": data.created_at, "headline": data.headline, "summary": data.summary, "source": data.source, "symbols": ",".join(data.symbols) if data.symbols else ""}
+        asyncio.create_task(process_and_save_in_background(news_item_dict, vector_store))
 
     except Exception as e:
-        print(f"\n🚨 ANALİZ SIRASINDA KRİTİK BİR HATA OLUŞTU: {e}")
+        print(f"\n🚨 ANA ANALİZ DÖNGÜSÜ HATASI: {e}")
 
+
+# --- 5. ANA UYGULAMAYI BAŞLATMA ---
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     news_stream = NewsDataStream(ALPACA_API_KEY, ALPACA_SECRET_KEY)
     news_stream.subscribe_news(analyze_news_on_arrival, '*')
-    print(f"--- CANLI HABER ANALİZ SİSTEMİ AKTİF ---")
-    print(f"İzleme Listesi: {SYMBOL_WATCHLIST}")
+    print(f"--- CANLI HABER ANALİZ SİSTEMİ AKTİF (ANLIK ÖĞRENME MODU) ---")
     news_stream.run()

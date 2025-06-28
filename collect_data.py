@@ -1,117 +1,91 @@
+# collect_data.py
+
 import pandas as pd
 from datetime import datetime
 import time
 import os
 from dotenv import load_dotenv
-
 from alpaca.data.historical import NewsClient
 from alpaca.data.requests import NewsRequest
+import config  # Ayar dosyamızı import ediyoruz
 
+# .env dosyasındaki API anahtarlarını yükle
 load_dotenv()
 
-# --- 1. AYARLAR ---
-API_KEY = os.getenv("ALPACA_API_KEY")
-SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
+# --- 1. AYARLAR (config'den okunacak) ---
+API_KEY = os.getenv(config.ALPACA_API_KEY_ENV)
+SECRET_KEY = os.getenv(config.ALPACA_SECRET_KEY_ENV)
 news_client = NewsClient(API_KEY, SECRET_KEY)
 
-CSV_FILENAME = "raw_news_addition.csv"
-BASLANGIC_TARIHI = "2020-01-01"
-SEMBOLLER_LISTESI = ['BTC/USD', "BTC", 'BTCUSD',
-                     'ETH/USD', "ETH", 'ETHUSD',
-                     "SOL/USD", "SOL", 'SOLUSD',
-                     "XRP/USD", "XRP", 'XRPUSD',
-                     "BNB/USD", "BNB", 'BNBUSD',
-                     'SPY', 'QQQ'
-                     ]
-SEMBOLLER_STRING = ",".join(SEMBOLLER_LISTESI) 
-SLEEP_TIME = 1
+# Ayarlar artık merkezi config dosyasından geliyor
+CSV_FILENAME = config.RAW_NEWS_CSV
+START_DATE = config.ARCHIVE_START_DATE
+SYMBOLS_LIST = config.SYMBOLS_TO_TRACK
 # --- AYARLAR SONU ---
 
 def collect_historical_news():
-    print("Alpaca Arşivleme Script'i Başlatıldı...")
+    """
+    Belirtilen başlangıç tarihinden bugüne kadar olan tüm haberleri Alpaca'dan çeker
+    ve geçici bir CSV dosyasına yazar.
+    """
+    print("Alpaca Geçmiş Veri Toplama Script'i Başlatıldı...")
     
-    if os.path.exists(CSV_FILENAME):
-        try:
-            df_existing = pd.read_csv(CSV_FILENAME)
-            cekilen_haber_idleri = set(df_existing['id']) if 'id' in df_existing.columns else set()
-            print(f"Mevcut arşivde {len(df_existing)} haber bulundu.")
-        except pd.errors.EmptyDataError:
-            df_existing = pd.DataFrame()
-            cekilen_haber_idleri = set()
-            print("Mevcut arşiv dosyası boş.")
-    else:
-        df_existing = pd.DataFrame()
-        cekilen_haber_idleri = set()
-
-    tarih_araligi = pd.date_range(start=BASLANGIC_TARIHI, end=datetime.now(), freq='D')
+    # Tarih aralığını belirle
+    tarih_araligi = pd.date_range(start=START_DATE, end=datetime.now(), freq='D')
     all_news_data = []
 
     print(f"{len(tarih_araligi)} gün için veri taranacak. Bu işlem uzun sürebilir...")
 
+    # Gün gün geriye doğru giderek verileri çek
     for gun in reversed(tarih_araligi):
-        print(f"\nİşlenen Tarih: {gun.date()}")
+        print(f"\nİşlenen Tarih: {gun.date()}", end="")
         page_token = None
+        found_total_in_day = 0
 
         while True:
             try:
                 request_params = NewsRequest(
-                    symbols=SEMBOLLER_STRING,
+                    symbols=SYMBOLS_LIST,
                     start=gun.strftime("%Y-%m-%d"),
                     end=(gun + pd.Timedelta(days=1)).strftime("%Y-%m-%d"),
                     limit=50,
                     page_token=page_token
                 )
-
                 news_page = news_client.get_news(request_params)
                 
-                # --- NİHAİ DÜZELTME: DOĞRU VERİ YOLU ---
-                # Teşhis çıktısından öğrendiğimiz doğru yapı: news_page.data['news']
-                if news_page and news_page.data and 'news' in news_page.data:
-                    haber_listesi = news_page.data['news']
-                    found_in_page = 0
-                    
+                # Gelen verinin doğru formatta olup olmadığını kontrol et
+                if news_page and hasattr(news_page, 'news') and news_page.news:
+                    haber_listesi = news_page.news
                     for haber in haber_listesi:
-                        if haber.id not in cekilen_haber_idleri:
-                            all_news_data.append({
-                                "id": haber.id,
-                                "timestamp": haber.created_at,
-                                "headline": haber.headline,
-                                "summary": haber.summary,
-                                "source": haber.source,
-                                "symbols": haber.symbols
-                            })
-                            cekilen_haber_idleri.add(haber.id)
-                            found_in_page += 1
-                    
-                    if found_in_page > 0:
-                        print(f"  -> Sayfadan {found_in_page} yeni haber bulundu.")
-                # --- DÜZELTME SONU ---
-
+                        all_news_data.append({
+                            "id": haber.id, "timestamp": haber.created_at, "headline": haber.headline,
+                            "summary": haber.summary, "source": haber.source, "symbols": haber.symbols
+                        })
+                    found_total_in_day += len(haber_listesi)
+                
+                # Bir sonraki sayfa varsa devam et, yoksa döngüyü kır
                 if news_page and news_page.next_page_token:
                     page_token = news_page.next_page_token
-                    time.sleep(SLEEP_TIME)
+                    time.sleep(0.5) # API limitlerine takılmamak için küçük bir bekleme
                 else:
                     break
-            
             except Exception as e:
-                print(f"  -> HATA: {gun.date()} tarihinde veri çekilirken bir sorun oluştu: {e}")
+                print(f" -> HATA: {e}")
                 break
+        
+        if found_total_in_day > 0:
+            print(f" -> {found_total_in_day} ham haber bulundu.")
 
     if not all_news_data:
-        print("\nArşive eklenecek yeni haber bulunamadı.")
+        print("\nİşlenecek yeni haber bulunamadı.")
         return
 
-    print(f"\nToplam {len(all_news_data)} yeni haber toplandı.")
-
-    df_new = pd.DataFrame(all_news_data)
-    df_combined = pd.concat([df_existing, df_new]).drop_duplicates(subset=['id'], ignore_index=True)
+    print(f"\nToplam {len(all_news_data)} ham haber toplandı.")
+    df_new = pd.DataFrame(all_news_data).drop_duplicates(subset=['id'], ignore_index=True)
     
-    df_combined['timestamp'] = pd.to_datetime(df_combined['timestamp'])
-    df_combined.sort_values(by='timestamp', ascending=False, inplace=True)
-    
-    df_combined.to_csv(CSV_FILENAME, index=False, encoding='utf-8-sig')
-    print(f"\nİşlem tamamlandı. Arşivdeki toplam haber sayısı: {len(df_combined)}")
-    print(f"Veriler '{CSV_FILENAME}' dosyasına kaydedildi.")
+    # Toplanan tüm veriyi geçici dosyaya yaz (her çalıştığında üzerine yazar)
+    df_new.to_csv(CSV_FILENAME, index=False, encoding='utf-8-sig')
+    print(f"Toplanan ham veriler geçici olarak '{CSV_FILENAME}' dosyasına kaydedildi.")
 
 if __name__ == '__main__':
     collect_historical_news()
