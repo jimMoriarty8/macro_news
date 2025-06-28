@@ -1,5 +1,6 @@
 # update_database.py
-
+# update_database.py dosyasının en üstüne
+from langchain_community.vectorstores.utils import filter_complex_metadata
 import pandas as pd
 import os
 import html
@@ -89,6 +90,9 @@ def update_and_build_databases():
         )
         for _, row in tqdm(df_combined_for_chroma.iterrows(), total=df_combined_for_chroma.shape[0], desc="Dökümanlar Vektöre Çevriliyor")
     ]
+    # --- YENİ EKLENEN BÖLÜM ---
+    print("Karmaşık metadata (tarih formatı gibi) temizleniyor...")
+    documents_to_embed = filter_complex_metadata(documents_to_embed)
     if not documents_to_embed:
         print("Vektör veritabanına eklenecek döküman bulunamadı.")
         return
