@@ -19,12 +19,12 @@ def initialize_analyst_assistant():
     # API anahtarını doğrudan ortam değişkenlerinden al
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        # Eğer anahtar bulunamazsa, programın çöküp nedenini söylemesini sağla
+        # Hata mesajını aranan anahtarla tutarlı hale getiriyoruz.
         raise ValueError("HATA: GOOGLE_API_KEY ortam değişkeni bulunamadı! Lütfen Render'daki Environment Group'u kontrol edin.")
-    
-    # Gerekli araçları ve modelleri başlat
-    embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL)
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
+
+    # DÜZELTME 2: Anahtarı DOĞRUDAN modellere parametre olarak iletiyoruz.
+    embeddings = GoogleGenerativeAIEmbeddings(model=config.EMBEDDING_MODEL, google_api_key=api_key)
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, google_api_key=api_key)
     
     # Veritabanı var mı diye kontrol et, yoksa boş oluştur.
     if os.path.exists(config.CHROMA_DB_PATH):
