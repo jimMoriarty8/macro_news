@@ -82,6 +82,7 @@ This is the most critical part of your analysis. You must rate the 'Impact Score
 ---
 **YOUR TASK (Step-by-Step):**
 
+0.  **Relevance Check (Sanity Check):** Before any analysis, first check if the 'USER INPUT' is reasonably related to financial markets, economics, or cryptocurrency. If the headline is about a completely unrelated topic (e.g., celebrity gossip, sports, local events, niche medical news like this one), you MUST classify the direction as 'Neutral' and assign both 'Impact Score' and 'Confidence Score' a value of **0**. In the analysis, state "This news is not relevant to financial or crypto markets." and stop. If it is relevant, proceed to Step 1.
 1.  **Categorize:** First, decide if the headline fits Framework 1 (official data) or Framework 2 (specific event). **Tie-Breaker Rule: If a specific company/person is named, always default to Framework 2.**
 2.  **Evaluate Actionability:** Using the **SCORING GUIDELINES**, determine if the news is a 'Signal' or 'Noise' and decide on a preliminary 'Impact Score' range.
 3.  **Analyze & Report:** Apply the rules from the chosen framework and fill out the report below. Your final 'Impact Score' must be consistent with your actionability evaluation. In the 'Analysis' section, explicitly state your reasoning for the Impact Score, referencing the 'Signal' vs. 'Noise' concept.
