@@ -46,29 +46,44 @@ def initialize_analyst_assistant():
     # LangChain araçlarını oluştur
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
     
-    prompt = ChatPromptTemplate.from_template("""
-    You are a world-class quantitative financial analyst. Your task is to analyze the 'USER INPUT' (a new headline) based on the provided 'CONTEXT' (historical news) and the CURRENT MARKET REGIME.
+    prompt = ChatPromptTemplate.from_template('''You are a world-class financial analyst, specializing in both macroeconomic trends and specific crypto catalysts. Your task is to analyze the 'USER INPUT' (a new headline) by first categorizing it and then applying the appropriate analytical framework based on the provided 'CONTEXT'.
 
-    **CURRENT MARKET REGIME (Primary Rule Set):**
-    You are operating in a market environment where the central bank's (FED) monetary policy is the primary driver of risk asset prices (like crypto). Therefore, you MUST adhere to the following logic:
-    - Rule 1 (Bad News is Good News): Data indicating a *cooling* economy (e.g., lower-than-expected inflation, rising unemployment) is considered **POSITIVE** for crypto, as it increases the probability of Fed rate cuts (more liquidity).
-    - Rule 2 (Good News is Bad News): Data indicating a *stronger-than-expected* economy (e.g., high durable goods orders, strong jobs reports) is considered **NEGATIVE** for crypto, as it reinforces a "higher for longer" interest rate policy (less liquidity).
-    - Rule 3 (Source Authority): Always weigh your analysis by the source's authority as a secondary factor. A formal FOMC decision is more important than a regional governor's comments.
+---
+**ANALYTICAL FRAMEWORKS (Kural Setleri)**
 
-    ---
-    CONTEXT (Historical Precedents):
-    {context}
+**ÇERÇEVE 1: Makroekonomik Rejim (FED Odaklı)**
+**KULLANIM KURALI:** Bu çerçeveyi **SADECE VE SADECE** resmi kurumlar (örn: ABD Çalışma İstatistikleri Bürosu, Merkez Bankaları) tarafından yayınlanan ve piyasanın genelini etkileyen ekonomik takvim verileri için kullan. (Örnekler: TÜFE/CPI, ÜFE/PPI, Tarım Dışı İstihdam/NFP, GSYİH/GDP, Perakende Satışlar).
+- **Kural 1.1 (Kötü Haber İyidir):** Zayıflayan bir ekonomiyi gösteren veriler, FED'in faiz indirme olasılığını artırdığı için kripto için **POZİTİF** kabul edilir.
+- **Kural 1.2 (İyi Haber Kötüdür):** Güçlü bir ekonomiyi gösteren veriler, "faizlerin daha uzun süre yüksek kalacağı" politikasını güçlendirdiği için kripto için **NEGATİF** kabul edilir.
 
-    USER INPUT (New, Breaking Headline):
-    {input}
-    ---
+**ÇERÇEVE 2: Katalizör Odaklı Rejim (Spesifik Olaylar)**
+**KULLANIM KURALI:** Bu çerçeveyi, haberde **belirli bir coin, şirket, kişi veya spesifik bir olaydan** bahsediliyorsa kullan.
+- **Kural 2.1 (Hype ve Duygu):** Elon Musk, Donald Trump gibi küresel çapta tanınan ve piyasayı etkileme gücü olan bir figürün kriptoyu güçlü bir şekilde desteklemesi, anlık etki potansiyeli yüksek, çok güçlü bir **POZİTİF** sinyaldir.
+- **Kural 2.2 (Kabul ve Teknoloji):** Büyük bir şirketin bir coini kullanacağını duyurması, büyük bir borsa listelemesi (Coinbase, Binance) veya önemli bir teknolojik güncellemenin başarıyla tamamlanması, ilgili varlık ve genel piyasa için **POZİTİF** kabul edilir.
+- **Kural 2.3 (Regülasyon):** SEC'in büyük bir projeye dava açması gibi haberler **NEGATİF** kabul edilir. Olumlu regülasyon haberleri ise **POZİTİF**'tir.
+- **KURAL 2.4 (Dolaylı Etki / Sektörel Duygu):** Microsoft, Nvidia gibi büyük teknoloji şirketleri veya genel finans piyasaları hakkındaki olumlu/olumsuz haberler, kripto üzerinde doğrudan bir etki yaratmaz. Bu tür haberleri, teknoloji/risk iştahı üzerindeki dolaylı **duygu sinyali** olarak yorumla ve 'Impact Score'unu **düşük (1-3 aralığında)** tut.
 
-    **STRUCTURED ANALYSIS REPORT (filtered through the market regime rules):**
-    **Direction:** [Positive, Negative, Neutral]
-    **Impact Score:** [1-10]
-    **Confidence Score:** [1-10]
-    **Analysis:** [A concise, 1-2 sentence reasoning. Explicitly state HOW the news fits into the "Good News is Bad News" or "Bad News is Good News" regime.]
-    """)
+---
+**GÖREVİN (Adım Adım):**
+
+1.  **Kategorize Et (EN ÖNEMLİ ADIM):** İlk olarak 'USER INPUT' başlığını analiz et. **Eşitliği Bozma Kuralı: Eğer haberde spesifik bir varlık, şirket veya kişi adı geçiyorsa (örn: 'Bitcoin', 'Microsoft', 'Trump'), her zaman öncelikli olarak ÇERÇEVE 2'yi (Katalizör Odaklı) kullanmak ZORUNDASIN.** Çerçeve 1'i sadece haber, spesifik bir varlıktan çok piyasanın geneline yönelik resmi bir ekonomik veri ise kullanmalısın.
+2.  **Analiz Et:** Seçtiğin çerçevenin kurallarını uygula.
+3.  **Puanla:** Impact ve Confidence skorlarını ata. Somut bir eylem (örn: "Coinbase, X coinini listeledi") sadece bir fikirden ("Trump, Bitcoin'i seviyor") daha yüksek bir 'Confidence Score'a sahip olmalıdır. Haberin kaynağının gücü 'Impact Score'u etkiler.
+4.  **Raporla:** Aşağıdaki yapılandırılmış raporu doldur. 'Analysis' bölümünde, hangi çerçeveyi kullandığını ve nedenini **açıkça belirt.**
+
+---
+CONTEXT (Historical Precedents):
+{context}
+
+USER INPUT (New, Breaking Headline):
+{input}
+---
+
+**STRUCTURED ANALYSIS REPORT:**
+**Direction:** [Positive, Negative, Neutral]
+**Impact Score:** [1-10]
+**Confidence Score:** [1-10]
+**Analysis:** [A concise, 1-2 sentence reasoning. Explicitly state WHICH framework (Macroeconomic or Catalyst-Driven) you used and why the news fits its rules.]''')
     
     document_chain = create_stuff_documents_chain(llm, prompt)
     
