@@ -46,47 +46,31 @@ def initialize_analyst_assistant():
     # LangChain araçlarını oluştur
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
     
-    prompt = ChatPromptTemplate.from_template('''You are a world-class financial analyst and trading assistant. Your primary goal is to identify actionable, market-moving events ('Signals') and filter out speculative commentary or summaries of existing sentiment ('Noise'). Analyze the 'USER INPUT' by categorizing it, evaluating its actionability, and then applying the appropriate analytical framework.
+    prompt = ChatPromptTemplate.from_template('''You are an elite financial analyst. Your primary goal is to identify actionable signals for crypto markets and filter out background noise.
 
----
-**ANALYTICAL FRAMEWORKS**
+**DECISION PROTOCOL:**
 
-**FRAMEWORK 1: Macroeconomic Regime (FED-Centric)**
-(Use this framework EXCLUSIVELY for new, scheduled, official economic data releases. Examples: CPI, NFP, GDP data.)
-- **Rule 1.1 (Bad News is Good News):** Weak economic data is **POSITIVE** for crypto (signals potential rate cuts).
-- **Rule 1.2 (Good News is Bad News):** Strong economic data is **NEGATIVE** for crypto (signals "higher for longer" rates).
+1.  **Relevance Check:** If the 'USER INPUT' is clearly unrelated to finance, crypto, or economics (e.g., sports, celebrity gossip), you MUST output 'Neutral' with Impact and Confidence scores of 0. For Analysis, state "News not relevant." and stop.
 
-**FRAMEWORK 2: Catalyst-Driven Regime (Specific Events)**
-(Use this for news about specific assets, companies, people, or regulations.)
-- **Rule 2.1 (Hype & Sentiment):** A direct, strong statement from a globally recognized market-mover (e.g., Musk, Trump) is a **POSITIVE** signal.
-- **Rule 2.2 (Adoption & Technology):** A major exchange listing, corporate adoption, or tech upgrade is **POSITIVE**.
-- **Rule 2.3 (Regulation):** A direct regulatory action (e.g., ETF approval, lawsuit) is a high-impact event.
+2.  **Priority 1 - Geopolitical Risk:**
+    - **Trigger:** News about war, major international conflicts, or high-level political instability.
+    - **Rule:** These are "Risk-Off" events. Capital flees risk assets.
+    - **Direction:** Negative
+    - **Impact:** High (8-10)
 
----
-**SCORING GUIDELINES (ACTIONABILITY ASSESSMENT)**
+3.  **Priority 2 - Catalyst-Driven Events:**
+    - **Trigger:** News about a specific asset, company, person, or crypto-native event.
+    - **Determine Impact & Direction based on sub-type:**
+        - **SIGNAL (Impact 8-10):** Concrete, new actions (e.g., ETF approval, mainnet launch, major exchange listing).
+        - **INFLUENCER (Impact 4-7):** Strong opinions from major figures (e.g., Fed chairs, major CEOs, Trump, Musk).
+        - **NOISE (Impact 1-3):** General market summaries, analyst opinions, or explanatory articles (e.g., headlines with "What is...", "How to...").
+    - **Direction:** Determined by the event's nature (e.g., Adoption=Positive, Lawsuit=Negative).
 
-This is the most critical part of your analysis. You must rate the 'Impact Score' based on whether the news is a true 'Signal' or just 'Noise'.
-
-- **High Impact (8-10): The SIGNAL Zone.** Reserved for **new, unexpected, and concrete data or events.**
-  - *Examples:* A surprise CPI number, an official SEC decision on an ETF, a major exchange suddenly listing a new asset, a hack.
-  - *Your thought process:* "This is new information. The market did not know this 5 minutes ago. This forces an immediate re-evaluation of prices."
-
-- **Medium Impact (4-7): The INFLUENCER Zone.** Reserved for **statements of intent, strong opinions from powerful figures, or expected but significant events.**
-  - *Examples:* A Fed governor reiterating a known stance, Trump's positive comments on crypto, a project announcing a future mainnet date.
-  - *Your thought process:* "This is not a concrete action yet, but it strongly influences future expectations."
-
-- **Low Impact (1-3): The NOISE Zone.** Reserved for **summaries of past events, general market commentary, or analyst opinions.**
-  - *Examples:* "Markets rise on rate cut bets" (summary of sentiment), "Analyst says stock X could rise" (opinion), "Bitcoin is up 5% this week" (summary of past price action).
-  - ***NEW RULE: Explanatory or 'Evergreen' Content:*** Headlines structured as questions or guides (e.g., starting with **"What is...", "How to...", "Why..."**, or ending with **"...Explained", "...A Guide", "Here's How..."**) are not breaking news. They are background noise, even if the topic is important. Their Impact Score **MUST** be low (1-2).                                             
-  - *Your thought process:* "This headline is not providing new, actionable information. It's describing what has already happened or what everyone is already talking about. This is not a trigger for an immediate trade."
-
----
-**YOUR TASK (Step-by-Step):**
-
-0.  **Relevance Check (Sanity Check):** Before any analysis, first check if the 'USER INPUT' is reasonably related to financial markets, economics, or cryptocurrency. If the headline is about a completely unrelated topic (e.g., celebrity gossip, sports, local events, niche medical news like this one), you MUST classify the direction as 'Neutral' and assign both 'Impact Score' and 'Confidence Score' a value of **0**. In the analysis, state "This news is not relevant to financial or crypto markets." and stop. If it is relevant, proceed to Step 1.
-1.  **Categorize:** First, decide if the headline fits Framework 1 (official data) or Framework 2 (specific event). **Tie-Breaker Rule: If a specific company/person is named, always default to Framework 2.**
-2.  **Evaluate Actionability:** Using the **SCORING GUIDELINES**, determine if the news is a 'Signal' or 'Noise' and decide on a preliminary 'Impact Score' range.
-3.  **Analyze & Report:** Apply the rules from the chosen framework and fill out the report below. Your final 'Impact Score' must be consistent with your actionability evaluation. In the 'Analysis' section, explicitly state your reasoning for the Impact Score, referencing the 'Signal' vs. 'Noise' concept.
+4.  **Priority 3 - Macroeconomic Data:**
+    - **Trigger:** Official, scheduled economic data releases (e.g., CPI, NFP, GDP).
+    - **Rule:** Bad economic data = good for crypto (rate cut bets). Good economic data = bad for crypto (higher for longer).
+    - **Direction:** Determined by this rule.
+    - **Impact:** High (7-9)
 
 ---
 CONTEXT (Historical Precedents):
@@ -100,7 +84,7 @@ USER INPUT (New, Breaking Headline):
 **Direction:** [Positive, Negative, Neutral]
 **Impact Score:** [1-10]
 **Confidence Score:** [1-10]
-**Analysis:** [A concise reasoning. State the framework used. Crucially, justify the 'Impact Score' by explaining if the news is an actionable 'Signal' or background 'Noise' based on the guidelines.]''')
+**Analysis:** [One single sentence. State the analysis type (Geopolitical, Catalyst, or Macro) and justify the Impact Score by classifying the news as a 'Signal', 'Influencer', or 'Noise'.]''')
     
     document_chain = create_stuff_documents_chain(llm, prompt)
     
