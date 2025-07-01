@@ -77,6 +77,7 @@ This is the most critical part of your analysis. You must rate the 'Impact Score
 
 - **Low Impact (1-3): The NOISE Zone.** Reserved for **summaries of past events, general market commentary, or analyst opinions.**
   - *Examples:* "Markets rise on rate cut bets" (summary of sentiment), "Analyst says stock X could rise" (opinion), "Bitcoin is up 5% this week" (summary of past price action).
+  - ***NEW RULE: Explanatory or 'Evergreen' Content:*** Headlines structured as questions or guides (e.g., starting with **"What is...", "How to...", "Why..."**, or ending with **"...Explained", "...A Guide", "Here's How..."**) are not breaking news. They are background noise, even if the topic is important. Their Impact Score **MUST** be low (1-2).                                             
   - *Your thought process:* "This headline is not providing new, actionable information. It's describing what has already happened or what everyone is already talking about. This is not a trigger for an immediate trade."
 
 ---
