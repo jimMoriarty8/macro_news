@@ -26,6 +26,8 @@ LIVE_BUFFER_CSV = os.path.join(DATA_DIR, "live_buffer.csv")
 RAW_NEWS_CSV = os.path.join(DATA_DIR, "temp_raw_news.csv")
 
 
+LLM_MODEL = "models/gemini-2.5-flash"
+
 # --- SEMBOL AYARLARI ---
 # Takip edilecek semboller
 SYMBOLS_TO_TRACK = [
