@@ -23,19 +23,22 @@ from analysis_engine import (
     send_telegram_message, 
     get_btc_price
 )
-import config # config.py'yi de import edelim
+# import config # Artık config.py'ye ihtiyacımız yok
 
 # .env dosyasını yükle
 load_dotenv()
 
 # --- 1. AYARLAR ---
-# Bu ayarlar artık config.py'den okunacak ama burada kalabilirler
-# veya doğrudan config modülünden çağrılabilirler.
+# Ayarları doğrudan bu dosyada tanımlayarak hatayı gideriyoruz.
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
-CONFIDENCE_THRESHOLD = config.CONFIDENCE_THRESHOLD
-IMPACT_THRESHOLD = config.IMPACT_THRESHOLD
-SYMBOL_WATCHLIST = config.TAKIP_EDILEN_SEMBOLLER
+CONFIDENCE_THRESHOLD = 7
+IMPACT_THRESHOLD = 7
+SYMBOL_WATCHLIST = {
+    'BTC/USD', 'BTC', 'ETH/USD', 'ETH', 'SOL/USD', 'SOL', 
+    'XRP/USD', 'XRP', 'SPY', 'QQQ'
+}
+
 
 # --- 2. RAG SİSTEMİ KURULUMU ---
 # Program başlarken, analiz ve güncelleme için gerekli olan 3 aracı birden alıyoruz.
