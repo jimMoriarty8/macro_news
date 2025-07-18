@@ -1,21 +1,19 @@
-# main_controller.py dosyanızın son hali
+# main_controller.py (Düzeltilmiş ve Sağlamlaştırılmış Versiyon)
 
 import os
 import html
 import logging
-import pandas as pd
 import asyncio
 from dotenv import load_dotenv
 from alpaca.data.live.news import NewsDataStream
 from langchain.docstore.document import Document
 from langchain_chroma import Chroma
 
-# --- YENİ EKLENEN IMPORTLAR ---
+# Gerekli LangChain importları
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough # Daha sağlam zincirler için
-# --- YENİ IMPORTLAR SONU ---
+from langchain_core.runnables import RunnablePassthrough
 
 # Kendi dosyalarımızdan importlar
 from analysis_engine import (
@@ -24,32 +22,29 @@ from analysis_engine import (
     send_telegram_message, 
     get_btc_price
 )
-import config # config.py'yi de import edelim
+import config
 
 # .env dosyasını yükle
 load_dotenv()
 
 # --- 1. AYARLAR ---
-# Ayarları doğrudan bu dosyada tanımlayarak hatayı gideriyoruz.
+# Ayarları config.py dosyasından okuyoruz
 ALPACA_API_KEY = os.getenv("ALPACA_API_KEY")
 ALPACA_SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
-CONFIDENCE_THRESHOLD = 7
-IMPACT_THRESHOLD = 7
-SYMBOL_WATCHLIST = {
-    'BTC/USD', 'BTC', 'ETH/USD', 'ETH', 'SOL/USD', 'SOL', 
-    'XRP/USD', 'XRP', 'SPY', 'QQQ'
-}
+CONFIDENCE_THRESHOLD = config.CONFIDENCE_THRESHOLD
+IMPACT_THRESHOLD = config.IMPACT_THRESHOLD
+SYMBOL_WATCHLIST = config.SYMBOL_WATCHLIST
 
 
 # --- 2. RAG SİSTEMİ KURULUMU ---
-# Program başlarken, analiz ve güncelleme için gerekli olan 3 aracı birden alıyoruz.
-retriever, document_chain_legacy, vector_store = initialize_analyst_assistant()
+# Program başlarken, app.py'den sadece temel araçları alıyoruz
+retriever, _, vector_store = initialize_analyst_assistant()
 
 # --- YENİ VE DAHA SAĞLAM ZİNCİR YAPISI (LCEL) ---
-# document_chain'i yeniden, daha modern bir yapıyla tanımlıyoruz.
-# Bu, invoke/ainvoke metotlarıyla tam uyumlu çalışır.
-llm = document_chain_legacy.llm # app.py'de oluşturulan llm'i alalım
-prompt = document_chain_legacy.prompt # app.py'de oluşturulan prompt'u alalım
+# LLM ve Prompt'u doğrudan bu dosyada, config'den gelen ayarlarla tanımlıyoruz.
+# Bu, önceki AttributeError hatasını çözer.
+llm = ChatGoogleGenerativeAI(model=config.LLM_MODEL, temperature=0.2)
+prompt = ChatPromptTemplate.from_template(config.SYSTEM_PROMPT)
 
 rag_chain = (
     {"context": retriever, "input": RunnablePassthrough()}
@@ -75,14 +70,14 @@ except Exception as e:
 
 # --- 3. ARKA PLAN GÖREVİ ---
 async def process_and_save_in_background(news_dict: dict, vs: Chroma):
-    # ... (Mevcut kodunuz burada kalacak)
+    # ... (Bu kısım sizin kodunuzdaki gibi kalabilir)
     pass 
 
 
 # --- 4. CANLI HABER ANALİZ FONKSİYONU ---
 async def analyze_news_on_arrival(data):
     """
-    Hızlıca haberi alır, analiz eder ve yavaş olan kaydetme işini arka plana atar.
+    Haberi alır, analiz eder ve kaydetme işini arka plana atar.
     """
     try:
         is_relevant = any(watched_symbol in str(data.symbols) for watched_symbol in SYMBOL_WATCHLIST)
@@ -100,16 +95,11 @@ async def analyze_news_on_arrival(data):
                 headline_tr = await translator_chain.ainvoke({"headline": headline_en})
                 print(f"   -> Çeviri başarılı: {headline_tr}")
             except Exception as e:
-                print(f"   -> Çeviri sırasında hata: {e}")
-                headline_tr = "(Çeviri yapılamadı)"
-        else:
-            print("   -> UYARI: Çeviri motoru yüklenemediği için çeviri adımı atlandı.")
-
-        # --- DÜZELTME BURADA: Artık .ainvoke() kullanıyoruz ---
+                headline_tr = f"(Çeviri hatası: {e})"
+        
+        # Analiz adımı
         print("   -> Analiz ediliyor...")
-        # Artık get_relevant_documents ve invoke yerine tek bir ainvoke çağrısı yapıyoruz.
         report_text = await rag_chain.ainvoke(headline_en)
-        # --- DÜZELTME SONU ---
         
         print("\n--- ANALYST REPORT ---")
         print(report_text)
@@ -119,16 +109,16 @@ async def analyze_news_on_arrival(data):
             print(f"✅ ALARM KRİTERLERİ KARŞILANDI!")
             btc_price = get_btc_price()
             direction = parsed_report.get('direction', 'N/A')
-            direction_emoji = "🟢" if direction.lower() == 'positive' else "🔴" if direction.lower() == 'negative' else "⚪️"
+            direction_emoji = "🟢" if direction.lower() == 'positive' else "🔴"
             
             message = (
-                f"{direction_emoji} *High-Potential Signal: {direction.upper()}*\n"
+                f"{direction_emoji} *Signal: {direction.upper()}*\n"
                 f"*BTC/USDT Price:* `{btc_price}`\n\n"
                 f"*Haber (TR):*\n`{headline_tr}`\n\n"
                 f"*Headline (EN):*\n`{headline_en}`\n\n"
                 f"*Scores:*\n"
                 f"Impact: *{parsed_report.get('impact')}/10* | Confidence: *{parsed_report.get('confidence')}/10*\n\n"
-                f"*Analyst Comment:*\n_{parsed_report.get('analysis', '')}_"
+                f"*Commentary:*\n_{parsed_report.get('analysis', '')}_"
             )
             send_telegram_message(message)
         else:
@@ -146,6 +136,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     news_stream = NewsDataStream(ALPACA_API_KEY, ALPACA_SECRET_KEY)
     news_stream.subscribe_news(analyze_news_on_arrival, '*')
-    print(f"--- CANLI HABER ANALİZ SİSTEMİ AKTİF (ANLIK ÖĞRENME MODU) ---")
+    print(f"--- CANLI HABER ANALİZ SİSTEMİ AKTİF ---")
     print(f"İzleme Listesi: {list(SYMBOL_WATCHLIST)}")
     news_stream.run()
