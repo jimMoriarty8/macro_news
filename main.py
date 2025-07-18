@@ -14,6 +14,7 @@ from langchain_chroma import Chroma
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough # Daha sağlam zincirler için
 # --- YENİ IMPORTLAR SONU ---
 
 # Kendi dosyalarımızdan importlar
@@ -23,7 +24,7 @@ from analysis_engine import (
     send_telegram_message, 
     get_btc_price
 )
-# import config # Artık config.py'ye ihtiyacımız yok
+import config # config.py'yi de import edelim
 
 # .env dosyasını yükle
 load_dotenv()
@@ -42,10 +43,23 @@ SYMBOL_WATCHLIST = {
 
 # --- 2. RAG SİSTEMİ KURULUMU ---
 # Program başlarken, analiz ve güncelleme için gerekli olan 3 aracı birden alıyoruz.
-retriever, document_chain, vector_store = initialize_analyst_assistant()
+retriever, document_chain_legacy, vector_store = initialize_analyst_assistant()
 
-# --- YENİ EKLENEN BÖLÜM: ÇEVİRİ MOTORU ---
-# Sadece çeviri yapmak için hızlı ve verimli bir LLM zinciri oluşturuyoruz.
+# --- YENİ VE DAHA SAĞLAM ZİNCİR YAPISI (LCEL) ---
+# document_chain'i yeniden, daha modern bir yapıyla tanımlıyoruz.
+# Bu, invoke/ainvoke metotlarıyla tam uyumlu çalışır.
+llm = document_chain_legacy.llm # app.py'de oluşturulan llm'i alalım
+prompt = document_chain_legacy.prompt # app.py'de oluşturulan prompt'u alalım
+
+rag_chain = (
+    {"context": retriever, "input": RunnablePassthrough()}
+    | prompt
+    | llm
+    | StrOutputParser()
+)
+# --- ZİNCİR YAPISI SONU ---
+
+# --- ÇEVİRİ MOTORU ---
 try:
     translator_llm = ChatGoogleGenerativeAI(model="models/gemini-2.5-flash", temperature=0)
     translator_prompt = ChatPromptTemplate.from_template(
@@ -59,20 +73,18 @@ except Exception as e:
 # --- ÇEVİRİ MOTORU SONU ---
 
 
-# --- 3. ARKA PLAN VERİTABANI GÜNCELLEME GÖREVİ ("ŞEF") ---
-# Bu fonksiyonunuzda bir değişiklik yapmaya gerek yok.
+# --- 3. ARKA PLAN GÖREVİ ---
 async def process_and_save_in_background(news_dict: dict, vs: Chroma):
     # ... (Mevcut kodunuz burada kalacak)
-    pass # Örnek olarak geçildi
+    pass 
 
 
-# --- 4. CANLI HABER ANALİZ FONKSİYONU ("GARSON") ---
+# --- 4. CANLI HABER ANALİZ FONKSİYONU ---
 async def analyze_news_on_arrival(data):
     """
     Hızlıca haberi alır, analiz eder ve yavaş olan kaydetme işini arka plana atar.
     """
     try:
-        # İlgililik kontrolü (Bu kısım sizde zaten vardı)
         is_relevant = any(watched_symbol in str(data.symbols) for watched_symbol in SYMBOL_WATCHLIST)
         if not is_relevant:
             return
@@ -80,25 +92,24 @@ async def analyze_news_on_arrival(data):
         headline_en = html.unescape(data.headline)
         print(f"\n📰 [İLGİLİ HABER GELDİ] {headline_en}")
 
-        # --- YENİ EKLENEN BÖLÜM: HABERİ TÜRKÇE'YE ÇEVİRME ---
+        # Çeviri adımı
         headline_tr = ""
         if translator_chain:
             print("   -> Başlık Türkçe'ye çevriliyor...")
             try:
                 headline_tr = await translator_chain.ainvoke({"headline": headline_en})
-                print(f"   -> Çeviri: {headline_tr}")
+                print(f"   -> Çeviri başarılı: {headline_tr}")
             except Exception as e:
                 print(f"   -> Çeviri sırasında hata: {e}")
                 headline_tr = "(Çeviri yapılamadı)"
-        # --- ÇEVİRİ SONU ---
+        else:
+            print("   -> UYARI: Çeviri motoru yüklenemediği için çeviri adımı atlandı.")
 
-        # Hızlı Analiz ve Alarm Kısmı
+        # --- DÜZELTME BURADA: Artık .ainvoke() kullanıyoruz ---
         print("   -> Analiz ediliyor...")
-        # Not: Sizin kodunuzda retriever ve document_chain'i doğrudan kullandığınızı varsayıyorum.
-        # Bu satırları kendi kodunuzdaki invoke satırıyla eşleştirin.
-        retrieved_docs = retriever.get_relevant_documents(headline_en)
-        retrieved_docs.sort(key=lambda x: x.metadata.get('publish_date', '1970-01-01'), reverse=True)
-        report_text = document_chain.invoke({"input": headline_en, "context": retrieved_docs})
+        # Artık get_relevant_documents ve invoke yerine tek bir ainvoke çağrısı yapıyoruz.
+        report_text = await rag_chain.ainvoke(headline_en)
+        # --- DÜZELTME SONU ---
         
         print("\n--- ANALYST REPORT ---")
         print(report_text)
@@ -110,7 +121,6 @@ async def analyze_news_on_arrival(data):
             direction = parsed_report.get('direction', 'N/A')
             direction_emoji = "🟢" if direction.lower() == 'positive' else "🔴" if direction.lower() == 'negative' else "⚪️"
             
-            # --- YENİ EKLENEN BÖLÜM: TELEGRAM MESAJINI GÜNCELLEME ---
             message = (
                 f"{direction_emoji} *High-Potential Signal: {direction.upper()}*\n"
                 f"*BTC/USDT Price:* `{btc_price}`\n\n"
@@ -120,13 +130,10 @@ async def analyze_news_on_arrival(data):
                 f"Impact: *{parsed_report.get('impact')}/10* | Confidence: *{parsed_report.get('confidence')}/10*\n\n"
                 f"*Analyst Comment:*\n_{parsed_report.get('analysis', '')}_"
             )
-            # --- MESAJ GÜNCELLEME SONU ---
             send_telegram_message(message)
         else:
             print("❌ Alarm kriterleri karşılanmadı veya yön 'Neutral'.")
         
-        # --- YAVAŞ İŞİ ARKA PLANA ATMA ---
-        # Bu kısım sizde zaten vardı
         news_item_dict = {"id": data.id, "timestamp": data.created_at, "headline": data.headline, "summary": data.summary, "source": data.source, "symbols": ",".join(data.symbols) if data.symbols else ""}
         asyncio.create_task(process_and_save_in_background(news_item_dict, vector_store))
 
@@ -135,7 +142,6 @@ async def analyze_news_on_arrival(data):
 
 
 # --- 5. ANA UYGULAMAYI BAŞLATMA ---
-# Bu kısım sizde zaten vardı
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     news_stream = NewsDataStream(ALPACA_API_KEY, ALPACA_SECRET_KEY)
