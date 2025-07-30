@@ -14,6 +14,10 @@ import requests
 from binance.client import Client as BinanceClient
 from googletrans import Translator
 
+# --- MODÜL SEVİYESİNDE NESNE OLUŞTURMA (İYİLEŞTİRME) ---
+# Translator nesnesini her seferinde yeniden oluşturmak yerine bir kere oluşturup tekrar kullanıyoruz.
+translator_instance = Translator()
+
 def initialize_analyst_assistant():
     """
     Vektör veritabanını, LLM'i ve temel RAG parçalarını kurar.
@@ -91,10 +95,8 @@ def translate_to_turkish(text: str) -> str:
     if not text:
         return "Çeviri için metin mevcut değil."
     try:
-        # Not: googletrans kütüphanesi resmi bir Google API'si değildir.
-        # Yoğun kullanımda veya API değişikliklerinde sorun çıkarabilir.
-        translator = Translator()
-        translation = translator.translate(text, src='en', dest='tr')
+        # Önceden oluşturulmuş nesneyi kullanıyoruz.
+        translation = translator_instance.translate(text, src='en', dest='tr')
         return translation.text
     except Exception as e:
         print(f"UYARI: Metin çevrilemedi. Hata: {e}")
