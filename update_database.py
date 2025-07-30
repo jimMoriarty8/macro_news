@@ -22,30 +22,49 @@ os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY") # Bu satır aslında 
 RAW_DATA_CSV = config.RAW_NEWS_CSV
 KNOWLEDGE_BASE_CSV = config.KNOWLEDGE_BASE_CSV
 CHROMA_DB_PATH = config.CHROMA_DB_PATH
+LIVE_BUFFER_CSV = config.LIVE_BUFFER_CSV
 EMBEDDING_MODEL = config.EMBEDDING_MODEL
 # --- AYARLAR SONU ---
 
 def update_and_build_databases():
     """
-    Ham veri dosyasını okur, işler ve hem ana CSV arşivini hem de
-    ChromaDB vektör veritabanını sıfırdan oluşturur/günceller.
+    Geçmiş (`temp_raw_news.csv`) ve canlı (`live_buffer.csv`) haber kaynaklarını okur,
+    işler ve hem ana CSV arşivini hem de ChromaDB vektör veritabanını günceller.
     """
     print("\nVeritabanı oluşturma/güncelleme süreci başlatıldı...")
 
-    # 1. Ham veriyi yükle
-    if not os.path.exists(RAW_DATA_CSV):
-        print(f"HATA: '{RAW_DATA_CSV}' dosyası bulunamadı. Görünüşe göre collect_data.py hiç haber bulamadı. İşlem durduruluyor.")
+    # 1. Tüm yeni veri kaynaklarını (geçmiş ve canlı) topla
+    dfs_to_process = []
+    files_to_clean = []
+
+    if os.path.exists(RAW_DATA_CSV):
+        try:
+            df_raw = pd.read_csv(RAW_DATA_CSV)
+            if not df_raw.empty:
+                print(f"'{RAW_DATA_CSV}' dosyasından {len(df_raw)} geçmiş haber yüklendi.")
+                dfs_to_process.append(df_raw)
+                files_to_clean.append(RAW_DATA_CSV)
+        except pd.errors.EmptyDataError:
+            print(f"UYARI: '{RAW_DATA_CSV}' dosyası boş.")
+
+    if os.path.exists(LIVE_BUFFER_CSV):
+        try:
+            df_live = pd.read_csv(LIVE_BUFFER_CSV)
+            if not df_live.empty:
+                print(f"'{LIVE_BUFFER_CSV}' dosyasından {len(df_live)} canlı haber yüklendi.")
+                dfs_to_process.append(df_live)
+                files_to_clean.append(LIVE_BUFFER_CSV)
+        except pd.errors.EmptyDataError:
+            print(f"UYARI: '{LIVE_BUFFER_CSV}' dosyası boş.")
+
+    if not dfs_to_process:
+        print("İşlenecek yeni haber bulunamadı. İşlem durduruluyor.")
         return
-    
-    try:
-        df_new_raw = pd.read_csv(RAW_DATA_CSV)
-        if df_new_raw.empty:
-            print(f"UYARI: '{RAW_DATA_CSV}' dosyası boş. İşlenecek yeni haber yok. İşlem durduruluyor.")
-            return
-        print(f"'{RAW_DATA_CSV}' dosyasından {len(df_new_raw)} ham haber yüklendi.")
-    except pd.errors.EmptyDataError:
-        print(f"UYARI: '{RAW_DATA_CSV}' dosyası boş. İşlenecek yeni haber yok. İşlem durduruluyor.")
-        return
+
+    # Tüm yeni verileri tek bir DataFrame'de birleştir
+    df_new_raw = pd.concat(dfs_to_process, ignore_index=True)
+    # Olası mükerrer kayıtları (aynı anda hem geçmişten hem canlıdan gelmiş olabilir) temizle
+    df_new_raw.drop_duplicates(subset=['id'], inplace=True)
 
     # 2. Veriyi temizle ve işle
     print("Veriler temizleniyor ve RAG formatına getiriliyor...")
@@ -115,6 +134,15 @@ def update_and_build_databases():
     db.persist()
     db = None # Belleği serbest bırak
     
+    # 5. İşlenen geçici dosyaları temizle
+    print("\nİşlenen geçici dosyalar temizleniyor...")
+    for file_path in files_to_clean:
+        try:
+            os.remove(file_path)
+            print(f" - '{os.path.basename(file_path)}' silindi.")
+        except OSError as e:
+            print(f"HATA: '{os.path.basename(file_path)}' silinirken hata oluştu: {e}")
+
     print("ChromaDB başarıyla oluşturuldu ve veriler kalıcı olarak kaydedildi.")
     print("\nTüm veri işleme işlemleri tamamlandı.")
 
