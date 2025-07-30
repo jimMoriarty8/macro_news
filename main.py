@@ -4,6 +4,7 @@ import os
 import html
 import logging
 import asyncio
+import pandas as pd
 from dotenv import load_dotenv
 
 from alpaca.data.live.news import NewsDataStream
@@ -16,7 +17,7 @@ from analysis_engine import (
     parse_analyst_report, 
     send_telegram_message, 
     get_btc_price
-)
+) 
 import config # Artık tüm ayarlar için config.py'yi kullanıyoruz
 
 # .env dosyasını yükle
@@ -42,9 +43,31 @@ retriever, document_chain, vector_store = initialize_analyst_assistant()
 
 # --- 4. ARKA PLAN GÖREVİ ---
 async def process_and_save_in_background(news_dict: dict, vs: Chroma):
-    # Bu fonksiyon, veritabanını ve CSV'yi günceller.
-    # Mantığı önceki mesajlarımızdaki gibi kalabilir.
-    pass 
+    """
+    Gelen haberi hem CSV tampon dosyasına hem de canlı ChromaDB'ye ekler.
+    """
+    try:
+        print(f"   -> Arka planda veritabanı güncelleniyor (ID: {news_dict.get('id')})...")
+        
+        # 1. LangChain dökümanı oluştur
+        rag_content = f"Headline: {news_dict['headline']}. Summary: {news_dict['summary']}"
+        document = Document(
+            page_content=rag_content,
+            metadata={
+                'source': news_dict.get('source'), 
+                'title': news_dict.get('headline'), 
+                'publish_date': str(news_dict.get('timestamp')) # ChromaDB için string'e çevirmek daha güvenli
+            }
+        )
+        
+        # 2. Canlı vektör veritabanına ekle
+        vs.add_documents([document])
+        
+        # 3. CSV tampon dosyasına ekle
+        df_live = pd.DataFrame([news_dict])
+        df_live.to_csv(config.LIVE_BUFFER_CSV, mode='a', header=not os.path.exists(config.LIVE_BUFFER_CSV), index=False, encoding='utf-8-sig')
+    except Exception as e:
+        print(f"🚨 ARKA PLAN GÜNCELLEME HATASI: {e}")
 
 # --- 5. CANLI HABER ANALİZ FONKSİYONU ---
 async def analyze_news_on_arrival(data):
@@ -69,8 +92,11 @@ async def analyze_news_on_arrival(data):
         print("\n--- ANALYST REPORT ---")
         print(report_text)
         
+        is_alarm = False
         parsed_report = parse_analyst_report(report_text)
-        if parsed_report and parsed_report.get('confidence', 0) >= CONFIDENCE_THRESHOLD and parsed_report.get('impact', 0) >= IMPACT_THRESHOLD and parsed_report.get('direction').lower() != 'neutral':
+        if parsed_report:
+            is_alarm = parsed_report.get('confidence', 0) >= CONFIDENCE_THRESHOLD and parsed_report.get('impact', 0) >= IMPACT_THRESHOLD and parsed_report.get('direction', '').lower() != 'neutral'
+        if is_alarm:
             print(f"✅ ALARM KRİTERLERİ KARŞILANDI!")
             btc_price = get_btc_price()
             direction = parsed_report.get('direction', 'N/A')
@@ -86,7 +112,12 @@ async def analyze_news_on_arrival(data):
             )
             send_telegram_message(message)
         else:
-            print("❌ Alarm kriterleri karşılanmadı veya yön 'Neutral'.")
+            if parsed_report:
+                reason = f"Confidence: {parsed_report.get('confidence', 0)}/{CONFIDENCE_THRESHOLD}, Impact: {parsed_report.get('impact', 0)}/{IMPACT_THRESHOLD}, Direction: {parsed_report.get('direction', 'N/A')}"
+                print(f"❌ Alarm kriterleri karşılanmadı. ({reason})")
+            else:
+                print("❌ Alarm kriterleri karşılanmadı (Rapor ayrıştırılamadı).")
+
         
         # Arka planda veritabanını güncelleme
         news_item_dict = {"id": data.id, "timestamp": data.created_at, "headline": data.headline, "summary": data.summary, "source": data.source, "symbols": ",".join(data.symbols) if data.symbols else ""}
