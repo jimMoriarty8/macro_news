@@ -38,8 +38,9 @@ def clean_and_rebuild_all():
         initial_rows = len(df)
         print(f"Başlangıçtaki satır sayısı: {initial_rows}")
 
-        # 'timestamp' ve 'title' sütunlarına göre mükerrer olanları bul ve ilkini tut
-        df.drop_duplicates(subset=['timestamp', 'title'], keep='first', inplace=True)
+        # --- HATA DÜZELTME ---
+        # 'knowledge_base.csv' dosyasında 'title' sütunu yok, 'headline' var.
+        df.drop_duplicates(subset=['timestamp', 'headline'], keep='first', inplace=True)
         
         # Tarihe göre yeniden sırala (isteğe bağlı ama düzenli tutar)
         df['timestamp'] = pd.to_datetime(df['timestamp'])
@@ -85,7 +86,7 @@ def clean_and_rebuild_all():
             Document(
                 page_content=row['rag_content'],
                 metadata={'source': row.get('source', 'N/A'), 
-                          'title': row.get('title', 'N/A'), 
+                          'title': row.get('headline', 'N/A'), # HATA DÜZELTME: 'title' yerine 'headline' kullanılmalı
                           'publish_date': row.get('timestamp', 'N/A')}
             ) 
             for index, row in tqdm(df_clean.iterrows(), total=df_clean.shape[0], desc="Dökümanlar işleniyor")
@@ -95,11 +96,16 @@ def clean_and_rebuild_all():
         embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
         
         # Sıfırdan veritabanı oluştur
-        Chroma.from_documents(
+        db = Chroma.from_documents(
             documents=documents,
             embedding=embeddings,
             persist_directory=CHROMA_DB_PATH
         )
+        # --- KOD SAĞLAMLAŞTIRMA ---
+        # Veritabanının diske tam olarak yazıldığından emin olmak için persist() metodunu çağırıyoruz.
+        print("Veritabanı diske kaydediliyor...")
+        db.persist()
+        db = None # Belleği serbest bırak
         print(f"\n✅ Yeni ve temiz vektör veritabanı '{CHROMA_DB_PATH}' klasöründe başarıyla oluşturuldu!")
 
     except Exception as e:

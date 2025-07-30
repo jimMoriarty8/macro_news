@@ -109,6 +109,11 @@ def update_and_build_databases():
         embedding=embeddings,
         persist_directory=CHROMA_DB_PATH
     )
+    # --- KOD SAĞLAMLAŞTIRMA ---
+    # Veritabanının diske tam olarak yazıldığından emin olmak için persist() metodunu çağırıyoruz.
+    print("Veritabanı diske kaydediliyor...")
+    db.persist()
+    db = None # Belleği serbest bırak
     
     print("ChromaDB başarıyla oluşturuldu ve veriler kalıcı olarak kaydedildi.")
     print("\nTüm veri işleme işlemleri tamamlandı.")
