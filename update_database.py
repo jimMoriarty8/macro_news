@@ -9,6 +9,7 @@ import shutil
 from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
+from chromadb.config import Settings
 from langchain.docstore.document import Document
 from tqdm import tqdm
 import config
@@ -107,7 +108,11 @@ def update_and_build_databases():
     db = Chroma.from_documents(
         documents=documents_to_embed,
         embedding=embeddings,
-        persist_directory=CHROMA_DB_PATH
+        persist_directory=CHROMA_DB_PATH,
+        # --- İYİLEŞTİRME: TELEMETRİYİ KAPATMA ---
+        # Loglardaki gereksiz telemetri hatalarını önlemek için bu ayarı ekliyoruz.
+        # Bu, projenin çalışmasını etkilemez, sadece logları temizler.
+        client_settings=Settings(anonymized_telemetry=False)
     )
     
     print("ChromaDB başarıyla oluşturuldu ve veriler kalıcı olarak kaydedildi.")
