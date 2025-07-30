@@ -1,5 +1,6 @@
 # run_update.py
 
+
 # Diğer betiklerimizdeki ana fonksiyonları import ediyoruz
 from collect_data import collect_historical_news
 from update_database import update_and_build_databases

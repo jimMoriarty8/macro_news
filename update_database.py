@@ -1,4 +1,5 @@
 # update_database.py
+
 # update_database.py dosyasının en üstüne
 from langchain_community.vectorstores.utils import filter_complex_metadata
 import pandas as pd

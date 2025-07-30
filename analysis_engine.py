@@ -1,5 +1,6 @@
 # analysis_engine.py
 
+
 import os
 import pandas as pd
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
@@ -38,7 +39,7 @@ def initialize_analyst_assistant():
             documents = [
                 Document(
                     page_content=row['rag_content'],
-                    metadata={'source': row['source'], 'title': row['title'], 'publish_date': row['timestamp']}
+                    metadata={'source': row['source'], 'title': row['headline'], 'publish_date': row['timestamp']}
                 ) for index, row in df.iterrows()
             ]
             vector_store = Chroma.from_documents(

@@ -1,3 +1,4 @@
+
 import os
 # --- DEPLOYMENT AYARI ---
 # Bu satır, Render'daki kalıcı diskimizin yolunu gösterir.
