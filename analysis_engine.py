@@ -5,7 +5,6 @@ import os
 import pandas as pd
 from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
-from chromadb.config import Settings
 from langchain.docstore.document import Document
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
@@ -31,12 +30,7 @@ def initialize_analyst_components():
     
     if os.path.exists(config.CHROMA_DB_PATH):
         print(f"Mevcut vektör veritabanı '{config.CHROMA_DB_PATH}' klasöründen yükleniyor...")
-        vector_store = Chroma(
-            persist_directory=config.CHROMA_DB_PATH, 
-            embedding_function=embeddings,
-            # --- İYİLEŞTİRME: TELEMETRİYİ KAPATMA ---
-            client_settings=Settings(anonymized_telemetry=False)
-        )
+        vector_store = Chroma(persist_directory=config.CHROMA_DB_PATH, embedding_function=embeddings)
         print("Veritabanı başarıyla yüklendi.")
     else:
         print(f"UYARI: Henüz bir veritabanı bulunamadı. '{config.KNOWLEDGE_BASE_CSV}' dosyasından oluşturulacak...")
@@ -59,8 +53,7 @@ def initialize_analyst_components():
             vector_store = Chroma.from_documents(
                 documents=documents, 
                 embedding=embeddings, 
-                persist_directory=config.CHROMA_DB_PATH,
-                client_settings=Settings(anonymized_telemetry=False)
+                persist_directory=config.CHROMA_DB_PATH
             )
             print(f"Yeni veritabanı '{config.CHROMA_DB_PATH}' klasöründe başarıyla oluşturuldu.")
         except FileNotFoundError:

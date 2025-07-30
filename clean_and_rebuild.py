@@ -8,16 +8,16 @@ from dotenv import load_dotenv
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_chroma import Chroma
 from langchain.docstore.document import Document
-from tqdm import tqdm # İlerleme çubuğu için güzel bir kütüphane (pip install tqdm)
+from tqdm import tqdm
+import config
 
 # .env dosyasını yükle
 load_dotenv()
 
 # --- AYARLAR ---
-# Bu ayarların diğer betiklerinizdekiyle aynı olduğundan emin olun
 os.environ["GOOGLE_API_KEY"] = os.getenv("GEMINI_API_KEY")
-KNOWLEDGE_BASE_CSV = "knowledge_base.csv"
-CHROMA_DB_PATH = "./chroma_db"
+KNOWLEDGE_BASE_CSV = config.KNOWLEDGE_BASE_CSV
+CHROMA_DB_PATH = config.CHROMA_DB_PATH
 # --- AYARLAR SONU ---
 
 def clean_and_rebuild_all():

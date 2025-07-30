@@ -3,13 +3,11 @@ import os
 # --- DEPLOYMENT AYARI ---
 # Bu satır, Render'daki kalıcı diskimizin yolunu gösterir.
 # Projemiz Render'da çalışırken bu yol kullanılacak.
-DATA_DIR = "/data" 
-
-# --- YEREL BİLGİSAYARDA ÇALIŞTIRMAK İÇİN ---
-# Eğer kodu gelecekte kendi bilgisayarında denemek istersen, üstteki satırı yorum (#) haline getirip,
-# alttaki iki satırın yorumunu kaldırarak projenin mevcut klasörde çalışmasını sağlayabilirsin.
-# if not os.path.exists(DATA_DIR):
-#     DATA_DIR = os.getcwd()
+DATA_DIR = "/data"
+# Eğer /data yolu mevcut değilse (yani Render'da değilsek),
+# verileri projenin çalıştığı mevcut klasöre kaydet.
+if not os.path.exists(DATA_DIR):
+    DATA_DIR = os.getcwd()
 
 
 # --- VERİ TOPLAMA AYARLARI ---
