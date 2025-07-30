@@ -81,6 +81,11 @@ def update_and_build_databases():
     if os.path.exists(CHROMA_DB_PATH):
         shutil.rmtree(CHROMA_DB_PATH)
 
+    # --- KALICI DÜZELTME: VERİ TEMİZLİĞİ ---
+    # Veritabanı oluşturmadan önce 'rag_content' içeriği boş olan satırları temizle.
+    df_combined.dropna(subset=['rag_content'], inplace=True)
+    print(f"Boş 'rag_content' satırları temizlendi. Vektör veritabanına eklenecek haber sayısı: {len(df_combined)}")
+
     print("LangChain dökümanları hazırlanıyor...")
     
     documents_to_embed = [
