@@ -12,11 +12,7 @@ import config
 import re
 import requests
 from binance.client import Client as BinanceClient
-from googletrans import Translator
-
-# --- MODÜL SEVİYESİNDE NESNE OLUŞTURMA (İYİLEŞTİRME) ---
-# Translator nesnesini her seferinde yeniden oluşturmak yerine bir kere oluşturup tekrar kullanıyoruz.
-translator_instance = Translator()
+from deep_translator import GoogleTranslator
 
 def initialize_analyst_assistant():
     """
@@ -95,9 +91,8 @@ def translate_to_turkish(text: str) -> str:
     if not text:
         return "Çeviri için metin mevcut değil."
     try:
-        # Önceden oluşturulmuş nesneyi kullanıyoruz.
-        translation = translator_instance.translate(text, src='en', dest='tr')
-        return translation.text
+        # deep-translator kütüphanesini kullanarak çeviri yapıyoruz.
+        return GoogleTranslator(source='en', target='tr').translate(text)
     except Exception as e:
         print(f"UYARI: Metin çevrilemedi. Hata: {e}")
         return "Çeviri yapılamadı."
