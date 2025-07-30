@@ -81,21 +81,19 @@ def update_and_build_databases():
     if os.path.exists(CHROMA_DB_PATH):
         shutil.rmtree(CHROMA_DB_PATH)
 
-    # --- KALICI DÜZELTME: VERİ TEMİZLİĞİ ---
-    # Veritabanı oluşturmadan önce 'rag_content' içeriği boş olan satırları temizle.
-    df_combined.dropna(subset=['rag_content'], inplace=True)
-    print(f"Boş 'rag_content' satırları temizlendi. Vektör veritabanına eklenecek haber sayısı: {len(df_combined)}")
-
     print("LangChain dökümanları hazırlanıyor...")
-    
     documents_to_embed = [
         Document(
-            page_content=row['rag_content'],
-            metadata={'source': row.get('source'), 'title': row.get('headline'), 'publish_date': row.get('timestamp')}
+            # Boş içerik durumunda çökmemesi için varsayılan bir metin sağlıyoruz.
+            page_content=str(row['rag_content']) if pd.notna(row['rag_content']) else "Content not available",
+            metadata={
+                'source': row.get('source', 'N/A'), 
+                'title': row.get('headline', 'N/A'), 
+                'publish_date': str(row.get('timestamp', 'N/A'))
+            }
         )
         for _, row in tqdm(df_combined.iterrows(), total=df_combined.shape[0], desc="Dökümanlar Vektöre Çevriliyor")
     ]
-    # --- YENİ EKLENEN BÖLÜM ---
     print("Karmaşık metadata (tarih formatı gibi) temizleniyor...")
     documents_to_embed = filter_complex_metadata(documents_to_embed)
     if not documents_to_embed:

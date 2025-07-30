@@ -36,11 +36,19 @@ def initialize_analyst_assistant():
         print(f"UYARI: Henüz bir veritabanı bulunamadı. '{config.KNOWLEDGE_BASE_CSV}' dosyasından oluşturulacak...")
         try:
             df = pd.read_csv(config.KNOWLEDGE_BASE_CSV)
+            
             documents = [
                 Document(
-                    page_content=row['rag_content'],
-                    metadata={'source': row['source'], 'title': row['headline'], 'publish_date': row['timestamp']}
-                ) for index, row in df.iterrows()
+                    # Boş içerik durumunda çökmemesi için varsayılan bir metin sağlıyoruz.
+                    page_content=str(row['rag_content']) if pd.notna(row['rag_content']) else "Content not available",
+                    metadata={
+                        'source': row.get('source', 'N/A'), 
+                        'title': row.get('headline', 'N/A'), 
+                        # Metadata'da tarih gibi karmaşık nesneler sorun çıkarabildiği için string'e çeviriyoruz.
+                        'publish_date': str(row.get('timestamp', 'N/A'))
+                    }
+                ) 
+                for index, row in df.iterrows()
             ]
             vector_store = Chroma.from_documents(
                 documents=documents, 
