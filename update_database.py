@@ -82,14 +82,13 @@ def update_and_build_databases():
         shutil.rmtree(CHROMA_DB_PATH)
 
     print("LangChain dökümanları hazırlanıyor...")
-    df_combined_for_chroma = df_combined.rename(columns={'headline': 'title'})
     
     documents_to_embed = [
         Document(
             page_content=row['rag_content'],
-            metadata={'source': row.get('source'), 'title': row.get('title'), 'publish_date': row.get('timestamp')}
+            metadata={'source': row.get('source'), 'title': row.get('headline'), 'publish_date': row.get('timestamp')}
         )
-        for _, row in tqdm(df_combined_for_chroma.iterrows(), total=df_combined_for_chroma.shape[0], desc="Dökümanlar Vektöre Çevriliyor")
+        for _, row in tqdm(df_combined.iterrows(), total=df_combined.shape[0], desc="Dökümanlar Vektöre Çevriliyor")
     ]
     # --- YENİ EKLENEN BÖLÜM ---
     print("Karmaşık metadata (tarih formatı gibi) temizleniyor...")
