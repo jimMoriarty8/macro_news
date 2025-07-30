@@ -92,16 +92,3 @@ USER INPUT (New, Breaking Headline):
 **Confidence Score:** [1-10, based on the clarity and strength of the context]
 **Analysis:** [One single sentence. State the analysis type (e.g., Geopolitical, Catalyst-Signal, Macro) and justify your scores based on the rules and context.]
 """
-
-CHAT_PROMPT = """
-You are a helpful financial analyst assistant. Your task is to answer the user's question based on the provided context documents from your news archive.
-Provide a concise and clear answer. If the context does not contain the information to answer the question, state that you don't have enough information based on the available news archive.
-
-CONTEXT:
-{context}
-
-QUESTION:
-{input}
-
-ANSWER:
-"""

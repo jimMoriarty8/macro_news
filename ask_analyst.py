@@ -30,6 +30,12 @@ def main():
             print("Görüşmek üzere!")
             break
         
+        # --- GÜVENLİK KONTROLÜ ---
+        # Eğer input boş veya sadece boşluk karakterlerinden oluşuyorsa,
+        # işleme almadan döngünün başına dön ve tekrar sor.
+        if not question.strip():
+            continue
+        
         print("Analist düşünüyor...")
         # Kullanıcının sorusuna en uygun belgeleri veritabanından bul ve zinciri çalıştır
         context_docs = retriever.invoke(question)
