@@ -117,10 +117,10 @@ def parse_analyst_report(report_text):
         # Tek bir derlenmiş regex ile tüm alanları yakalamak daha verimlidir.
         # re.DOTALL, '.' karakterinin yeni satırları da eşleştirmesini sağlar.
         pattern = re.compile(
-            r"Direction:\s*\[?([^\]\n]+)\]?.*?"
-            r"Impact Score:\s*\[?(\d+).*?"
-            r"Confidence Score:\s*\[?(\d+).*?"
-            r"Analysis:\s*(.*)",
+            r"\s*\*{0,2}Direction\*{0,2}:\s*(.+?)\s+"
+            r"\*{0,2}Impact Score\*{0,2}:\s*(\d+)\s+"
+            r"\*{0,2}Confidence Score\*{0,2}:\s*(\d+)\s+"
+            r"\*{0,2}Analysis\*{0,2}:\s*(.*)",
             re.IGNORECASE | re.DOTALL
         )
         match = pattern.search(report_text)
