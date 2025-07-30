@@ -39,6 +39,17 @@ def main():
         print("Analist düşünüyor...")
         # Kullanıcının sorusuna en uygun belgeleri veritabanından bul ve zinciri çalıştır
         context_docs = retriever.invoke(question)
+        
+        # --- TEŞHİS İÇİN EKLENEN BÖLÜM ---
+        print("\n--- Retriever Tarafından Bulunan Bağlam (Context) ---")
+        if context_docs:
+            for i, doc in enumerate(context_docs):
+                print(f"  [Belge {i+1}] İçerik: {doc.page_content[:150]}... | Metadata: {doc.metadata}")
+        else:
+            print("  -> Soruyla ilgili hiçbir belge bulunamadı.")
+        print("-----------------------------------------------------\n")
+        # --- TEŞHİS SONU ---
+
         response = chat_chain.invoke({"input": question, "context": context_docs})
         
         print("\n--- Analistin Cevabı ---")
