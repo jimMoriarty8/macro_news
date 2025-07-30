@@ -16,16 +16,10 @@ SECRET_KEY = os.getenv("ALPACA_SECRET_KEY")
 news_client = NewsClient(API_KEY, SECRET_KEY)
 
 CSV_FILENAME = config.RAW_NEWS_CSV
-BASLANGIC_TARIHI = "2025-06-21"
-SEMBOLLER_LISTESI = ['BTC/USD', "BTC", 'BTCUSD',
-                     'ETH/USD', "ETH", 'ETHUSD',
-                     "SOL/USD", "SOL", 'SOLUSD',
-                     "XRP/USD", "XRP", 'XRPUSD',
-                     "BNB/USD", "BNB", 'BNBUSD',
-                     'SPY', 'QQQ'
-                     ]
-SEMBOLLER_STRING = ",".join(SEMBOLLER_LISTESI) 
-SLEEP_TIME = 1
+# Ayarları artık merkezi config dosyasından alıyoruz. Bu, tutarlılığı sağlar ve hataları önler.
+BASLANGIC_TARIHI = config.ARCHIVE_START_DATE
+SEMBOLLER_LISTESI = config.SYMBOLS_TO_TRACK
+SEMBOLLER_STRING = ",".join(SEMBOLLER_LISTESI)
 # --- AYARLAR SONU ---
 
 def collect_historical_news():
@@ -65,12 +59,11 @@ def collect_historical_news():
 
                 news_page = news_client.get_news(request_params)
                 
-                # --- NİHAİ DÜZELTME: DOĞRU VERİ YOLU ---
-                # Teşhis çıktısından öğrendiğimiz doğru yapı: news_page.data['news']
-                if news_page and news_page.data and 'news' in news_page.data:
-                    haber_listesi = news_page.data['news']
+                # --- KRİTİK DÜZELTME: DOĞRU VERİ ERİŞİM YOLU ---
+                # alpaca-py kütüphanesi haber listesini doğrudan .news özelliği altında döndürür.
+                if news_page and news_page.news:
+                    haber_listesi = news_page.news
                     found_in_page = 0
-                    
                     for haber in haber_listesi:
                         if haber.id not in cekilen_haber_idleri:
                             all_news_data.append({
@@ -86,11 +79,10 @@ def collect_historical_news():
                     
                     if found_in_page > 0:
                         print(f"  -> Sayfadan {found_in_page} yeni haber bulundu.")
-                # --- DÜZELTME SONU ---
 
                 if news_page and news_page.next_page_token:
                     page_token = news_page.next_page_token
-                    time.sleep(SLEEP_TIME)
+                    time.sleep(1) # Alpaca API limitlerine takılmamak için kısa bir bekleme
                 else:
                     break
             
