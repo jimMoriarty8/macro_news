@@ -83,7 +83,7 @@ async def analyze_news_on_arrival(data):
         # İlgililik kontrolü
         is_relevant = any(watched_symbol in str(data.symbols) for watched_symbol in SYMBOL_WATCHLIST)
         if not is_relevant:
-            return
+            print("not relevant")
 
         headline_en = html.unescape(data.headline)
         print(f"\n📰 [İLGİLİ HABER GELDİ] {headline_en}")
