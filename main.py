@@ -16,7 +16,8 @@ from analysis_engine import (
     initialize_analyst_assistant, 
     parse_analyst_report, 
     send_telegram_message, 
-    get_btc_price
+    get_btc_price,
+    translate_to_turkish
 ) 
 import config # Artık tüm ayarlar için config.py'yi kullanıyoruz
 
@@ -98,6 +99,10 @@ async def analyze_news_on_arrival(data):
             is_alarm = parsed_report.get('confidence', 0) >= CONFIDENCE_THRESHOLD and parsed_report.get('impact', 0) >= IMPACT_THRESHOLD and parsed_report.get('direction', '').lower() != 'neutral'
         if is_alarm:
             print(f"✅ ALARM KRİTERLERİ KARŞILANDI!")
+            
+            print("   -> Başlık Türkçe'ye çevriliyor...")
+            headline_tr = translate_to_turkish(headline_en)
+
             btc_price = get_btc_price()
             direction = parsed_report.get('direction', 'N/A')
             direction_emoji = "🟢" if direction.lower() == 'positive' else "🔴"
@@ -105,6 +110,7 @@ async def analyze_news_on_arrival(data):
             message = (
                 f"{direction_emoji} *Signal: {direction.upper()}*\n"
                 f"*BTC/USDT Price:* `{btc_price}`\n\n"
+                f"*Headline (TR):*\n`{headline_tr}`\n\n"
                 f"*Headline (EN):*\n`{headline_en}`\n\n"
                 f"*Scores:*\n"
                 f"Impact: *{parsed_report.get('impact')}/10* | Confidence: *{parsed_report.get('confidence')}/10*\n\n"

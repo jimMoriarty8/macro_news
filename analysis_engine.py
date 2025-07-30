@@ -12,6 +12,7 @@ import config
 import re
 import requests
 from binance.client import Client as BinanceClient
+from googletrans import Translator
 
 def initialize_analyst_assistant():
     """
@@ -63,48 +64,8 @@ def initialize_analyst_assistant():
 
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
     
-    # --- DÜZELTME BURADA ---
-    # Önce prompt metnini bir değişkene atıyoruz.
-    system_prompt = """
-You are an elite quantitative financial analyst. Your primary goal is to analyze the 'USER INPUT' and provide a structured, actionable signal by filtering it through your Decision Protocol.
-
-**DECISION PROTOCOL:**
-
-**Rule 0: Prioritize Recency.** This is the most important rule. When context documents conflict, you MUST base your analysis on the MOST RECENT document. Ignore older, contradictory information from the context.
-**Rule 1: Relevance Check.** If the 'USER INPUT' is clearly unrelated to finance, crypto, or economics (e.g., sports, celebrity gossip), classify as 'Noise' with Impact 0 and stop.
-**Rule 2: Geopolitical Risk.** - Trigger: News about war, major international conflicts, or high-level political instability.
-- Rule: These are "Risk-Off" events.
-- Direction: Negative
-- Impact: High (8-10)
-**Rule 3: Macroeconomic Data.**
-- Trigger: Official, scheduled economic data releases (e.g., CPI, NFP, GDP).
-- Rule: In the current market regime, "Bad economic data = good for crypto" (rate cut bets) and "Good economic data = bad for crypto" (higher for longer).
-- Direction: Determined by this rule.
-- Impact: High (7-9)
-**Rule 4: Catalyst-Driven Events.**
-- Trigger: News about a specific asset, company, person, or crypto-native event.
-- Determine Impact & Direction based on sub-type:
-    - **SIGNAL (Impact 8-10):** Concrete, new actions (e.g., ETF approval, mainnet launch, major acquisition).
-    - **INFLUENCER (Impact 4-7):** Strong opinions from major figures (e.g., Fed Chair, major CEOs, political leaders).
-    - **NOISE (Impact 1-3):** General market summaries, non-influential analyst opinions, or explanatory articles.
-
----
-CONTEXT (Historical Precedents):
-{context}
-
-USER INPUT (New, Breaking Headline):
-{input}
----
-
-**STRUCTURED ANALYSIS REPORT:**
-**Direction:** [Positive, Negative, Neutral]
-**Impact Score:** [1-10, determined by the protocol above]
-**Confidence Score:** [1-10, based on the clarity and strength of the context]
-**Analysis:** [One single sentence. State the analysis type (e.g., Geopolitical, Catalyst-Signal, Macro) and justify your scores based on the rules and context.]
-"""
-    # Sonra bu değişkeni fonksiyona parametre olarak veriyoruz.
-    prompt = ChatPromptTemplate.from_template(system_prompt)
-    # --- DÜZELTME SONU ---
+    # Prompt'u artık merkezi config dosyasından alıyoruz.
+    prompt = ChatPromptTemplate.from_template(config.SYSTEM_PROMPT)
     
     document_chain = create_stuff_documents_chain(llm, prompt)
     
@@ -124,6 +85,20 @@ def get_btc_price():
     except Exception as e:
         print(f"UYARI: Anlık BTC fiyatı çekilemedi. Hata: {e}")
         return "Price N/A"
+
+def translate_to_turkish(text: str) -> str:
+    """Verilen metni Türkçe'ye çevirir."""
+    if not text:
+        return "Çeviri için metin mevcut değil."
+    try:
+        # Not: googletrans kütüphanesi resmi bir Google API'si değildir.
+        # Yoğun kullanımda veya API değişikliklerinde sorun çıkarabilir.
+        translator = Translator()
+        translation = translator.translate(text, src='en', dest='tr')
+        return translation.text
+    except Exception as e:
+        print(f"UYARI: Metin çevrilemedi. Hata: {e}")
+        return "Çeviri yapılamadı."
 
 def send_telegram_message(message):
     """Belirtilen mesajı Telegram'a gönderir."""
@@ -146,13 +121,24 @@ def send_telegram_message(message):
 
 def parse_analyst_report(report_text):
     """LLM'den gelen metin raporunu ayrıştırır."""
+    # Bu fonksiyon, LLM'den gelen raporun formatındaki küçük değişikliklere karşı
+    # daha dayanıklı ve verimli olacak şekilde iyileştirildi.
     try:
-        direction = re.search(r"\*\*?Direction:\*\*?\s*\[?([^\]\n]+)\]?", report_text, re.IGNORECASE).group(1).strip()
-        impact = int(re.search(r"\*\*?Impact Score:\*\*?\s*\[?(\d+)", report_text, re.IGNORECASE).group(1))
-        confidence = int(re.search(r"\*\*?Confidence Score:\*\*?\s*\[?(\d+)", report_text, re.IGNORECASE).group(1))
-        analysis_match = re.search(r"\*\*?Analysis:\*\*?\s*([\s\S]*)", report_text, re.IGNORECASE)
-        analysis = analysis_match.group(1).strip() if analysis_match else "Analiz metni bulunamadı."
-        return {"direction": direction, "impact": impact, "confidence": confidence, "analysis": analysis}
-    except (AttributeError, IndexError, ValueError):
-        print(f"AYRIŞTIRMA HATASI: Rapor beklenen formatta değil.")
+        # Tek bir derlenmiş regex ile tüm alanları yakalamak daha verimlidir.
+        # re.DOTALL, '.' karakterinin yeni satırları da eşleştirmesini sağlar.
+        pattern = re.compile(
+            r"Direction:\s*\[?([^\]\n]+)\]?.*?"
+            r"Impact Score:\s*\[?(\d+).*?"
+            r"Confidence Score:\s*\[?(\d+).*?"
+            r"Analysis:\s*(.*)",
+            re.IGNORECASE | re.DOTALL
+        )
+        match = pattern.search(report_text)
+        if not match:
+            print(f"AYRIŞTIRMA HATASI: Rapor beklenen formatta değil. Rapor: {report_text[:200]}...")
+            return None
+
+        return {"direction": match.group(1).strip(), "impact": int(match.group(2)), "confidence": int(match.group(3)), "analysis": match.group(4).strip()}
+    except (IndexError, ValueError) as e:
+        print(f"AYRIŞTIRMA HATASI: Raporun bir kısmı ayrıştırılamadı. Hata: {e}")
         return None
