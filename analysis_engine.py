@@ -14,13 +14,12 @@ import requests
 from binance.client import Client as BinanceClient
 from deep_translator import GoogleTranslator
 
-def initialize_analyst_assistant():
+def initialize_analyst_components():
     """
-    Vektör veritabanını, LLM'i ve temel RAG parçalarını kurar.
-    main.py'nin hem analiz hem de veritabanı güncellemesi yapabilmesi için
-    gerekli olan 3 aracı (retriever, document_chain, vector_store) döndürür.
+    Vektör veritabanını, LLM'i ve retriever'ı kurar.
+    Farklı amaçlar için yeniden kullanılabilecek temel RAG bileşenlerini döndürür.
     """
-    print("RAG Analist Asistanı başlatılıyor...")
+    print("RAG sistem bileşenleri başlatılıyor...")
     
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
@@ -64,15 +63,9 @@ def initialize_analyst_assistant():
 
     retriever = vector_store.as_retriever(search_type="mmr", search_kwargs={"k": 10})
     
-    # Prompt'u artık merkezi config dosyasından alıyoruz.
-    prompt = ChatPromptTemplate.from_template(config.SYSTEM_PROMPT)
-    
-    document_chain = create_stuff_documents_chain(llm, prompt)
-    
-    print("\nAnalist Asistanı'nın tüm parçaları hazır.")
+    print("\nTemel RAG bileşenleri hazır.")
     print("="*50)
-    
-    return retriever, document_chain, vector_store
+    return llm, retriever, vector_store
 
 # --- Diğer Yardımcı Fonksiyonlar ---
 def get_btc_price():

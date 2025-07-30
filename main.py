@@ -9,11 +9,13 @@ from dotenv import load_dotenv
 
 from alpaca.data.live.news import NewsDataStream
 from langchain.docstore.document import Document
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_chroma import Chroma
 
 # Kendi dosyalarımızdan importlar
 from analysis_engine import (
-    initialize_analyst_assistant, 
+    initialize_analyst_components, 
     parse_analyst_report, 
     send_telegram_message, 
     get_btc_price,
@@ -34,9 +36,11 @@ IMPACT_THRESHOLD = config.IMPACT_THRESHOLD
 SYMBOL_WATCHLIST = config.SYMBOLS_TO_TRACK # Doğru değişken adını kullanıyoruz
 
 # --- 2. RAG SİSTEMİ KURULUMU ---
-# Program başlarken, app.py'den sadece temel araçları alıyoruz
-# initialize_analyst_assistant fonksiyonu artık config.py'deki ayarları kullanacak
-retriever, document_chain, vector_store = initialize_analyst_assistant()
+# Temel RAG bileşenlerini yüklüyoruz.
+llm, retriever, vector_store = initialize_analyst_components()
+# Bu betiğe özel analiz zincirini oluşturuyoruz.
+prompt = ChatPromptTemplate.from_template(config.SYSTEM_PROMPT)
+document_chain = create_stuff_documents_chain(llm, prompt)
 
 # --- 3. ÇEVİRİ MOTORU ---
 # Bu bölüm, önceki versiyonlardaki gibi kalabilir veya eklenebilir.
